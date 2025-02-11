@@ -1,4 +1,4 @@
-# 印度电商线缆产品定价策略优化
+# 跨境电商产品定价策略优化
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -55,6 +55,25 @@ graph TD
 
 ## 🚀 快速开始
 
+### 项目结构
+```
+ecomm-pricing-strategy/
+├── data/                # 数据文件
+│   └── amazon.csv
+├── src/                 # 源代码
+│   ├── data_preprocessing.py
+│   ├── price_elasticity.py
+│   ├── sentiment_analysis.py
+│   ├── pricing_model.py
+│   └── dashboard.py
+├── outputs/             # 输出结果
+│   └── report.txt
+├── docs/                # 文档
+│   └── images/
+├── requirements.txt     # 依赖包
+└── README.md
+```
+
 ### 环境要求
 - Python 3.8+
 - RAM ≥ 8GB
@@ -86,7 +105,7 @@ streamlit run app/dashboard.py
 ## 📊 核心分析
 
 ### 价格-销量弹性模型
-![价格弹性分析](https://via.placeholder.com/600x400?text=Price+Elasticity+Analysis)
+[价格弹性分析]
 
 ```python
 # 代码片段
@@ -124,14 +143,62 @@ B08WRWPM22, 三合一充电线, "库存周转率低"
 
 ## 🤝 贡献指南
 
+### 开发流程
+1. 配置开发环境
+```bash
+# 创建虚拟环境
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# 安装开发依赖
+pip install -r requirements.txt
+```
+
+2. 运行测试
+```bash
+python -m pytest tests/
+```
+
+3. 代码规范
+- 遵循 PEP 8 规范
+- 使用类型注解
+- 编写单元测试
+
+### 提交规范
+- feat: 新功能
+- fix: 修复问题
+- docs: 文档变更
+- style: 代码格式
+- refactor: 代码重构
+- test: 测试相关
+- chore: 其他修改
+
 1. Fork项目仓库
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启Pull Request
+2. 创建特性分支 (`
 
 ## 📜 许可证
+
+## 📝 更新日志
+
+### [1.0.0] - 2024-01-10
+#### 新增
+- 完整的数据分析流程
+- 交互式数据看板
+- 价格弹性模型
+
+#### 优化
+- 提升模型准确率
+- 优化UI交互体验
+
+#### 修复
+- 修复数据预处理中的异常值处理
+- 修复情感分析准确性问题
+
 本项目基于 [MIT License](LICENSE) 授权。
 
----
+## 📮 问题反馈
+
+- 提交 Issue: [GitHub Issues](https://github.com/jasonchen1001/ecomm-pricing-strategy/issues)
+- 邮件联系: yizhouchen68@gmail.com
+
 **优化定价策略，领跑市场竞逐** - [获取完整方案](yizhouchen68@gmail.com)

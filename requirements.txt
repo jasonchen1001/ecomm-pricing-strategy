@@ -3,4 +3,6 @@ numpy
 scikit-learn
 textblob
 matplotlib
-seaborn 
+seaborn
+streamlit
+plotly
