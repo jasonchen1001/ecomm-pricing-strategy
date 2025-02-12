@@ -8,6 +8,8 @@ from sentiment_analysis import SentimentAnalyzer
 import plotly.express as px
 import plotly.graph_objects as go
 import plotly.figure_factory as ff
+import numpy as np
+from sklearn.linear_model import LinearRegression
 
 # 设置页面配置
 st.set_page_config(
@@ -62,6 +64,43 @@ def main():
     # 侧边栏优化
     st.sidebar.image('https://upload.wikimedia.org/wikipedia/commons/4/4a/Amazon_icon.svg', width=100)
     st.sidebar.title('Analysis Controls')
+    
+    # 在侧边栏添加价格弹性分析设置
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("Price Elasticity Settings")
+    
+    # 弹性阈值设置
+    elasticity_threshold = st.sidebar.slider(
+        'Elasticity Threshold',
+        min_value=0.1,
+        max_value=2.0,
+        value=0.5,
+        step=0.1,
+        help="Threshold to determine high/low price elasticity"
+    )
+    
+    # 添加价格区间选择
+    price_segments = st.sidebar.number_input(
+        'Price Segments',
+        min_value=2,
+        max_value=10,
+        value=5,
+        help="Number of price segments for elasticity analysis"
+    )
+    
+    # 添加计算方法选择
+    elasticity_method = st.sidebar.selectbox(
+        'Calculation Method',
+        ['Log-Log', 'Point', 'Arc'],
+        help="Method to calculate price elasticity"
+    )
+    
+    # 添加时间窗口选择（如果有时间序列数据）
+    time_window = st.sidebar.selectbox(
+        'Analysis Period',
+        ['All Time', 'Last 30 Days', 'Last 90 Days', 'Last 180 Days'],
+        help="Time period for elasticity analysis"
+    )
     
     # 添加更多筛选器
     price_range = st.sidebar.slider(
@@ -147,29 +186,146 @@ def main():
             st.plotly_chart(fig, use_container_width=True)
             
         with col2:
-            st.subheader('Price vs Demand')
+            st.subheader('Price Elasticity Analysis')
             elasticity_analyzer = PriceElasticityAnalyzer()
             elasticity = elasticity_analyzer.calculate_elasticity(
                 filtered_df['discounted_price'].values,
-                filtered_df['rating_count'].values
+                filtered_df['rating_count'].values,
+                method=elasticity_method,
+                segments=price_segments
             )
-            st.metric('Price Elasticity', f"{elasticity:.2f}")
             
-            fig = px.scatter(
-                filtered_df,
-                x='discounted_price',
-                y='rating_count',
-                title='Price vs Demand',
-                labels={
-                    'discounted_price': 'Price (₹)',
-                    'rating_count': 'Demand (Reviews)'
-                },
-                hover_data=['product_name', 'rating']
-            )
+            # 显示分析结果
+            metrics_col1, metrics_col2, metrics_col3 = st.columns(3)
+            with metrics_col1:
+                st.metric('Price Elasticity', f"{elasticity:.2f}")
+            with metrics_col2:
+                st.metric('Threshold', f"{elasticity_threshold:.2f}")
+            with metrics_col3:
+                st.metric('Method', elasticity_method)
+            
+            # 根据用户设置的阈值判断
+            if elasticity < elasticity_threshold:
+                st.info(f"""
+                💡 低弹性市场特征 (< {elasticity_threshold:.2f}):
+                - 消费者对价格不敏感
+                - 具有较强的定价能力
+                - 建议策略：
+                  1. 可以适当提高价格
+                  2. 重点关注产品质量和品牌建设
+                  3. 通过差异化竞争而非价格战
+                """)
+            else:
+                st.warning(f"""
+                ⚠️ 高弹性市场特征 (≥ {elasticity_threshold:.2f}):
+                - 消费者对价格敏感
+                - 价格竞争激烈
+                - 建议策略：
+                  1. 保持价格竞争力
+                  2. 密切关注竞品定价
+                  3. 考虑促销策略
+                """)
+            
+            # Price vs Demand 图表部分
+            fig = go.Figure()
+            
+            # 添加基础散点图
+            fig.add_trace(go.Scatter(
+                x=filtered_df['discounted_price'],
+                y=filtered_df['rating_count'],
+                mode='markers',
+                name='Raw Data',
+                marker=dict(
+                    color='gray',
+                    opacity=0.5,
+                    size=8
+                ),
+                hovertemplate='<br>'.join([
+                    'Price: ₹%{x:.2f}',
+                    'Demand: %{y}',
+                    '<extra></extra>'
+                ])
+            ))
+            
+            # 根据不同方法添加趋势线
+            if elasticity_method == 'Log-Log':
+                # 对数回归拟合线
+                mask = (filtered_df['discounted_price'] > 0) & (filtered_df['rating_count'] > 0)
+                prices_clean = filtered_df['discounted_price'][mask]
+                quantities_clean = filtered_df['rating_count'][mask]
+                
+                X = np.log(prices_clean)
+                y = np.log(quantities_clean)
+                model = LinearRegression()
+                model.fit(X.values.reshape(-1, 1), y)
+                
+                # 生成预测线
+                x_range = np.linspace(X.min(), X.max(), 100)
+                y_pred = model.predict(x_range.reshape(-1, 1))
+                
+                fig.add_trace(go.Scatter(
+                    x=np.exp(x_range),
+                    y=np.exp(y_pred),
+                    mode='lines',
+                    name=f'Log-Log Fit (e={elasticity:.2f})',
+                    line=dict(color='red', width=2)
+                ))
+                
+            else:  # Point 或 Arc 方法
+                # 计算分段平均值
+                prices_series = pd.Series(filtered_df['discounted_price'])
+                quantities_series = pd.Series(filtered_df['rating_count'])
+                price_bins = pd.qcut(prices_series, price_segments)
+                avg_quantities = quantities_series.groupby(price_bins).mean()
+                avg_prices = prices_series.groupby(price_bins).mean()
+                
+                # 添加分段线和点
+                fig.add_trace(go.Scatter(
+                    x=avg_prices,
+                    y=avg_quantities,
+                    mode='lines+markers',
+                    name=f'{elasticity_method} Segments',
+                    line=dict(color='red', width=2),
+                    marker=dict(
+                        size=12,
+                        color='red',
+                        symbol='circle'
+                    ),
+                    hovertemplate='<br>'.join([
+                        'Segment Average:',
+                        'Price: ₹%{x:.2f}',
+                        'Demand: %{y:.0f}',
+                        '<extra></extra>'
+                    ])
+                ))
+                
+                # 添加段号标签
+                for i, (p, q) in enumerate(zip(avg_prices, avg_quantities)):
+                    fig.add_annotation(
+                        x=p,
+                        y=q,
+                        text=f'Segment {i+1}',
+                        showarrow=True,
+                        arrowhead=1
+                    )
+            
+            # 更新布局
             fig.update_layout(
+                title=f'Price vs Demand ({elasticity_method} Method)',
+                xaxis_title='Price (₹)',
+                yaxis_title='Demand (Reviews)',
                 hovermode='closest',
+                showlegend=True,
+                height=500,
+                template='plotly_white',
                 hoverlabel=dict(bgcolor="white"),
+                margin=dict(t=50, l=50, r=50, b=50)
             )
+            
+            # 添加网格线
+            fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
+            fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
+            
             st.plotly_chart(fig, use_container_width=True)
     
     with tab2:
@@ -272,7 +428,7 @@ def main():
     st.markdown("""---""")
     st.markdown("""
         <div style='text-align: center'>
-            <p>Made with ❤️ by Your Team | Data last updated: 2024</p>
+            <p>Made with ❤️ by Yanzhen Chen | Data last updated: 2025</p>
         </div>
     """, unsafe_allow_html=True)
 
