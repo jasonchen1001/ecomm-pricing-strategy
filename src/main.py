@@ -49,6 +49,22 @@ def generate_report(df, recommendations, elasticity, model_score):
     elasticity_analyzer = PriceElasticityAnalyzer()
     elasticity_analyzer.elasticity = elasticity
     
+    # 准备TOP5产品数据
+    top5_products = recommendations.head()[['product_id', 'current_price', 'recommended_price', 'expected_change']]
+    
+    # 格式化数值列，确保输出格式正确
+    top5_products = top5_products.round({
+        'current_price': 2,
+        'recommended_price': 2,
+        'expected_change': 2
+    })
+    
+    # 生成表格，不包含列名行
+    table_rows = []
+    for _, row in top5_products.iterrows():
+        table_rows.append(f"| {row['product_id']} | {row['current_price']:.2f} | {row['recommended_price']:.2f} | {row['expected_change']:.2f} |")
+    table_content = '\n'.join(table_rows)
+    
     report = f"""# 印度电商线缆产品定价策略分析报告
 
 ## 1. 市场概况 📊
@@ -72,7 +88,7 @@ def generate_report(df, recommendations, elasticity, model_score):
 ## 5. 重点关注产品 TOP5 ⭐
 | 产品ID | 当前价格 (₹) | 建议价格 (₹) | 预期变化 (%) |
 |--------|-------------|--------------|--------------|
-{recommendations.head().to_markdown(index=False)}
+{table_content}
 
 ## 6. 策略建议 📈
 
