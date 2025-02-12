@@ -153,6 +153,13 @@ class PriceElasticityAnalyzer:
 
     def interpret_elasticity(self, threshold=0.5):
         """解释价格弹性系数"""
+        # 确保有弹性系数值
+        if not hasattr(self, 'elasticity') or self.elasticity is None:
+            return """
+            无法解释价格弹性：未计算弹性系数。
+            请先调用 calculate_elasticity() 方法。
+            """
+        
         if self.elasticity < threshold:
             return f"""
             建议策略 (弹性系数 {self.elasticity:.2f} < {threshold:.2f}):
