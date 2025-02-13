@@ -6,7 +6,7 @@
 
 [English](#english) | [中文](#chinese)
 
-## English
+
 
 ### Overview
 An interactive dashboard for analyzing Amazon product data, with a focus on price elasticity, customer reviews, and market trends.
@@ -167,7 +167,6 @@ This project is licensed under the MIT License.
 
 ---
 
-## Chinese
 
 ### 概述
 一个交互式的亚马逊产品数据分析仪表板，重点关注价格弹性、客户评论和市场趋势。
