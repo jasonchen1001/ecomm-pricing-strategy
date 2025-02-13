@@ -1,8 +1,6 @@
 from textblob import TextBlob
 from collections import Counter
 import re
-import pandas as pd
-import matplotlib.pyplot as plt
 from nltk.corpus import stopwords
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 import nltk
