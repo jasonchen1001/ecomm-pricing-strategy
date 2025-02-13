@@ -18,83 +18,13 @@ class SentimentAnalyzer:
         
         # 获取英文停用词
         self.stop_words = set(stopwords.words('english'))
-        
-        # 添加产品相关的中性词（这些词不表达情感）
-        self.neutral_words = {
-            # 产品特征词
-            'cable', 'charger', 'charging', 'wire', 'cord', 'adapter', 'port',
-            'usb', 'type', 'power', 'device', 'phone', 'data', 'length', 'meter',
-            
-            # 品牌词
-            'amazon', 'brand', 'company', 'seller',
-            
-            # 时间和数量词
-            'time', 'day', 'month', 'year', 'piece', 'pack', 'size',
-            
-            # 常见动词
-            'use', 'using', 'used', 'buy', 'bought', 'purchase', 'ordered',
-            
-            # 其他中性词
-            'product', 'price', 'cost', 'review', 'rating'
-        }
-        
-        # 积极情感词典
-        self.positive_words = {
-            # 质量相关
-            'excellent', 'perfect', 'best', 'premium', 'superior',
-            'quality', 'durable', 'sturdy', 'reliable', 'solid',
-            
-            # 性能相关
-            'fast', 'quick', 'rapid', 'efficient', 'effective',
-            'powerful', 'strong', 'stable', 'smooth', 'seamless',
-            
-            # 评价相关
-            'amazing', 'awesome', 'fantastic', 'great', 'wonderful',
-            'satisfied', 'happy', 'impressed', 'recommended', 'worth',
-            'good', 'nice', 'love', 'perfect', 'excellent'
-        }
-        
-        # 消极情感词典
-        self.negative_words = {
-            # 质量相关
-            'poor', 'bad', 'terrible', 'horrible', 'cheap',
-            'defective', 'faulty', 'broken', 'damaged', 'fragile',
-            'low', 'poor', 'inferior', 'flimsy', 'loose',
-            'break', 'breaks', 'breaking', 'broke',
-            
-            # 性能相关
-            'slow', 'weak', 'unstable', 'inconsistent', 'unreliable',
-            'fail', 'failed', 'failing', 'fails', 'failure',
-            'stop', 'stops', 'stopped', 'stopping',
-            'disconnect', 'disconnects', 'disconnected',
-            'error', 'errors', 'problem', 'problems',
-            
-            # 评价相关
-            'disappointed', 'disappointing', 'disappointment',
-            'waste', 'wasted', 'wasting',
-            'avoid', 'avoided', 'avoiding',
-            'regret', 'regrets', 'regretted',
-            'return', 'returned', 'returning',
-            'refund', 'refunded', 'refunding',
-            'complaint', 'complaints', 'complaining',
-            'issue', 'issues', 'problem', 'problems',
-            'worse', 'worst', 'bad', 'badly',
-            'expensive', 'overpriced', 'costly',
-            'not worth', 'worthless', 'useless',
-            
-            # 其他负面词
-            'difficult', 'hard', 'trouble', 'troublesome',
-            'poor', 'cheap', 'cheaply', 'inferior',
-            'hate', 'hated', 'hating', 'dislike',
-            'angry', 'anger', 'frustrated', 'frustrating',
-            'annoying', 'annoyed', 'irritating', 'irritated',
-            'disappointed', 'disappointing', 'disappointment',
-            'wrong', 'incorrect', 'improper', 'inappropriate',
-            'damage', 'damaged', 'damaging', 'damages'
-        }
-        
-        # 更新停用词，加入中性词
-        self.stop_words.update(self.neutral_words)
+        # 添加产品相关的中性词
+        self.stop_words.update({
+            'cable', 'charger', 'wire', 'cord', 'adapter', 'device',
+            'amazon', 'product', 'price', 'review', 'star', 'rating',
+            'buy', 'bought', 'purchase', 'ordered', 'received',
+            'use', 'using', 'used', 'time', 'month', 'day', 'year'
+        })
     
     def analyze_text(self, text):
         """分析单条评论的情感"""
@@ -109,27 +39,26 @@ class SentimentAnalyzer:
         return df
     
     def get_frequent_words(self, texts, n=10, sentiment_type='positive'):
-        """获取高频情感词
-        
-        Args:
-            texts: 评论文本列表
-            n: 返回的高频词数量
-            sentiment_type: 'positive' 或 'negative'，指定要统计的情感类型
-        """
+        """获取高频情感词"""
         words = []
-        # 选择目标情感词典
-        target_words = self.positive_words if sentiment_type == 'positive' else self.negative_words
         
         for text in texts:
             if isinstance(text, str):
                 # 转换为小写并分词
                 text_words = re.findall(r'\w+', text.lower())
-                # 只保留目标情感词典中的词
+                # 过滤停用词和数字
                 text_words = [word for word in text_words 
-                             if word in target_words
-                             and not word.isdigit()
-                             and len(word) > 2]  # 过滤短词
-                words.extend(text_words)
+                            if word not in self.stop_words
+                            and not word.isdigit()
+                            and len(word) > 2]  # 过滤短词
+                
+                # 使用 TextBlob 判断每个词的情感
+                for word in text_words:
+                    sentiment = TextBlob(word).sentiment.polarity
+                    # 根据情感类型筛选词
+                    if (sentiment_type == 'positive' and sentiment > 0) or \
+                       (sentiment_type == 'negative' and sentiment < 0):
+                        words.append(word)
         
         # 统计词频
         word_freq = Counter(words)
@@ -141,4 +70,4 @@ class SentimentAnalyzer:
         negative_reviews = df[df['sentiment'] < 0]['review_content']
         
         self.positive_words = self.get_frequent_words(positive_reviews)
-        self.negative_words = self.get_frequent_words(negative_reviews) 
+        self.negative_words = self.get_frequent_words(negative_reviews)
