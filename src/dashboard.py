@@ -326,29 +326,33 @@ def main():
     
     # 侧边栏优化
     st.sidebar.image('https://upload.wikimedia.org/wikipedia/commons/4/4a/Amazon_icon.svg', width=100)
-    st.sidebar.title('Analysis Controls')
+    st.sidebar.title(get_display_text('Analysis Controls', '分析控制', lang))
     
     # 简化侧边栏设置
     st.sidebar.markdown("---")
-    st.sidebar.subheader("Price Elasticity Settings")
+    st.sidebar.subheader(get_display_text('Price Elasticity Settings', '价格弹性设置', lang))
     
     # 只保留弹性系数计算方法选择
     elasticity_method = st.sidebar.selectbox(
-        'Calculation Method',
+        get_display_text('Calculation Method', '计算方法', lang),
         ['Log-Log', 'Point', 'Arc'],
-        help="Method to calculate price elasticity"
+        help=get_display_text(
+            "Method to calculate price elasticity",
+            "计算价格弹性的方法",
+            lang
+        )
     )
     
     # 添加更多筛选器
     price_range = st.sidebar.slider(
-        'Price Range (₹)',
+        get_display_text('Price Range (₹)', '价格范围 (₹)', lang),
         float(df['discounted_price'].min()),
         float(df['discounted_price'].max()),
         (float(df['discounted_price'].min()), float(df['discounted_price'].max()))
     )
     
     rating_filter = st.sidebar.slider(
-        'Minimum Rating',
+        get_display_text('Minimum Rating', '最低评分', lang),
         min_value=0.0,
         max_value=5.0,
         value=0.0,
@@ -364,32 +368,33 @@ def main():
     filtered_df = df[mask]
     
     # 添加刷新按钮
-    if st.sidebar.button('Refresh Analysis'):
+    if st.sidebar.button(get_display_text('Refresh Analysis', '刷新分析', lang)):
         try:
             st.rerun()
         except AttributeError:
             try:
-                st.experimental_rerun()  # 兼容旧版本
+                st.experimental_rerun()
             except AttributeError:
-                st.error("Refresh functionality not available in this Streamlit version")
+                st.error(get_display_text(
+                    "Refresh functionality not available in this Streamlit version",
+                    "此版本的Streamlit不支持刷新功能",
+                    lang
+                ))
     
     # 使用tabs组织内容
     with tab1:
         # Price Analysis 内容
-        st.header(get_display_text('💰 Price Analysis', '💰 价格分析', lang))
+        #st.header(get_display_text('💰 Price Analysis', '💰 价格分析', lang))
         
         col1, col2 = st.columns(2)
         
         with col1:
-            st.subheader('Price Distribution')
+            st.subheader(get_display_text('💰 Price Distribution', '💰 价格分布', lang))
             fig = px.histogram(
                 filtered_df,
                 x='discounted_price',
-                nbins=30,
-                title='Price Distribution',
-                labels={'discounted_price': 'Price (₹)', 'count': 'Count'},
-                hover_data=['discounted_price'],
-                opacity=0.7,  # 调整透明度
+                nbins=50,
+                title=get_display_text(' Product Price Distribution', ' 产品价格分布', lang)
             )
             
             # 更新图表布局
@@ -427,16 +432,18 @@ def main():
             st.plotly_chart(fig, use_container_width=True)
             
             # 添加相关性分析
-            st.subheader('📊 Correlation Analysis')
+            st.markdown("---")
+            st.subheader(get_display_text('📊 Correlation Analysis', '📊 相关性分析', lang))
             correlation_matrix = filtered_df[
                 ['discounted_price', 'rating', 'rating_count', 'real_discount']
             ].corr()
             
+            # 双语标签
             labels = {
-                'discounted_price': 'Price',
-                'rating': 'Rating',
-                'rating_count': 'Reviews',
-                'real_discount': 'Discount'
+                'discounted_price': get_display_text('Price', '价格', lang),
+                'rating': get_display_text('Rating', '评分', lang),
+                'rating_count': get_display_text('Reviews', '评论数', lang),
+                'real_discount': get_display_text('Discount', '折扣', lang)
             }
             
             fig = go.Figure(data=go.Heatmap(
@@ -447,13 +454,17 @@ def main():
                 texttemplate='%{text}',
                 textfont={"size": 10},
                 hoverongaps=False,
-                hovertemplate='%{x} vs %{y}<br>Correlation: %{z:.2f}<extra></extra>',
+                hovertemplate=get_display_text(
+                    '%{x} vs %{y}<br>Correlation: %{z:.2f}',
+                    '%{x} vs %{y}<br>相关性: %{z:.2f}',
+                    lang
+                ) + '<extra></extra>',
                 colorscale='RdBu',
                 zmid=0
             ))
             
             fig.update_layout(
-                title='Correlation Matrix',
+                title=get_display_text('Correlation Matrix', '相关性矩阵', lang),
                 height=400,
                 hoverlabel=dict(bgcolor="white"),
             )
@@ -461,7 +472,7 @@ def main():
             st.plotly_chart(fig, use_container_width=True)
         
         with col2:
-            st.subheader('Price Elasticity Analysis')
+            st.subheader(get_display_text('📈 Price Elasticity Analysis', '📈 价格弹性分析', lang))
             
             # 计算价格弹性系数
             elasticity = elasticity_analyzer.calculate_elasticity(
@@ -471,37 +482,67 @@ def main():
             )
             
             # 显示弹性系数及其含义
-            st.metric('Price Elasticity', f"{elasticity:.2f}")
+            st.metric(get_display_text('Price Elasticity', '价格弹性系数', lang), f"{elasticity:.2f}")
             
             if elasticity < 0.5:
-                st.success("""
-                **低价格弹性** (< 0.5):
-                - 消费者对价格变化不敏感
-                - 可以考虑适当提高价格
-                - 重点关注产品质量和品牌建设
-                """)
+                st.success(get_display_text(
+                    '''
+                    **Low Price Elasticity** (< 0.5):
+                    - Consumers are less sensitive to price changes
+                    - Consider appropriate price increases
+                    - Focus on product quality and brand building
+                    ''',
+                    '''
+                    **低价格弹性** (< 0.5):
+                    - 消费者对价格变化不敏感
+                    - 可以考虑适当提高价格
+                    - 重点关注产品质量和品牌建设
+                    ''',
+                    lang
+                ))
             else:
-                st.warning("""
-                **高价格弹性** (≥ 0.5):
-                - 消费者对价格变化敏感
-                - 需要谨慎调整价格
-                - 关注竞品定价策略
-                """)
+                st.warning(get_display_text(
+                    '''
+                    **High Price Elasticity** (≥ 0.5):
+                    - Consumers are sensitive to price changes
+                    - Need careful price adjustments
+                    - Pay attention to competitor pricing
+                    ''',
+                    '''
+                    **高价格弹性** (≥ 0.5):
+                    - 消费者对价格变化敏感
+                    - 需要谨慎调整价格
+                    - 关注竞品定价策略
+                    ''',
+                    lang
+                ))
             
             # 根据不同的计算方法显示不同的价格-需求关系图
             if elasticity_method == 'Log-Log':
                 # 对数转换后的散点图
                 fig = px.scatter(
                     filtered_df,
-                    x=np.log(filtered_df['discounted_price']),
-                    y=np.log(filtered_df['rating_count']),
-                    title='Log-Log Price vs Demand',
+                    x='discounted_price',
+                    y='rating_count',
+                    title=get_display_text(
+                        'Price-Demand Relationship',
+                        '价格-需求关系图',
+                        lang
+                    ),
                     labels={
-                        'x': 'Log Price',
-                        'y': 'Log Demand'
-                    },
-                    trendline="ols"
+                        'discounted_price': get_display_text('Price (₹)', '价格 (₹)', lang),
+                        'rating_count': get_display_text('Demand (log)', '需求量 (对数)', lang)
+                    }
                 )
+                
+                # 添加趋势线
+                fig.add_traces(go.Scatter(
+                    x=filtered_df['discounted_price'],
+                    y=filtered_df['rating_count'].mean() * np.ones(len(filtered_df)),
+                    mode='lines',
+                    name=get_display_text('Trend Line', '趋势线', lang),
+                    line=dict(color='red', dash='dash')
+                ))
             elif elasticity_method == 'Point':
                 # 分段点弹性图
                 fig = px.scatter(
@@ -542,7 +583,7 @@ def main():
     
     with tab2:
         # Review Analysis 内容
-        st.header(get_display_text('📝 Review Analysis', '📝 评论分析', lang))
+        # st.header(get_display_text('📝 Review Analysis', '📝 评论分析', lang))
         
         # 显示情感分布指标
         total_reviews = len(df)
