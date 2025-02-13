@@ -6,7 +6,6 @@
 
 [English](#english) | [中文](#chinese)
 
-<a name="english"></a>
 ## English
 
 ### Overview
@@ -168,8 +167,7 @@ This project is licensed under the MIT License.
 
 ---
 
-<a name="chinese"></a>
-## 中文
+## Chinese
 
 ### 概述
 一个交互式的亚马逊产品数据分析仪表板，重点关注价格弹性、客户评论和市场趋势。
