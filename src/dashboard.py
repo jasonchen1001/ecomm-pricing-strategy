@@ -517,7 +517,7 @@ def main():
     with tab2:
         st.header('📝 Review Analysis')
         
-        # 显示情感分布指标
+        # 1. 情感分布指标
         total_reviews = len(df)
         positive_count = (df['sentiment'] == 1.0).sum()
         neutral_count = (df['sentiment'] == 0.0).sum()
@@ -527,7 +527,6 @@ def main():
         neutral_ratio = (neutral_count / total_reviews) * 100
         negative_ratio = (negative_count / total_reviews) * 100
         
-        # 使用列布局显示指标
         st.markdown("### 评论情感分布")
         metric_cols = st.columns(3)
         
@@ -552,7 +551,93 @@ def main():
                 f"{negative_count} 条评论"
             )
         
-        # 评分分布
+        # 2. 情感词分析
+        st.markdown("### 情感词分析")
+        
+        # 获取正面和负面评论的文本
+        positive_text = ' '.join(df[df['sentiment'] == 1.0]['review_content'].astype(str))
+        negative_text = ' '.join(df[df['sentiment'] == -1.0]['review_content'].astype(str))
+        
+        # 创建两列布局
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### 积极评论关键词")
+            # 词云图
+            if positive_text:
+                fig_pos = create_wordcloud(positive_text, "Positive Reviews", 'positive')
+                st.pyplot(fig_pos)
+            
+            # 积极情感词频率直方图
+            top_positive = get_top_sentiment_words(positive_text, 'positive', 10)
+            if top_positive:
+                # 创建渐变绿色（频次高的颜色更深）
+                n_bars = len(top_positive)
+                green_colors = [
+                    f'rgba(40, {200 - i * 15}, 40, {1 - i * 0.05})'  # 从深到浅的绿色
+                    for i in range(n_bars)
+                ]
+                
+                fig_pos_freq = go.Figure()
+                fig_pos_freq.add_trace(go.Bar(
+                    x=[word for word, _ in top_positive],  # 不需要反转，保持原有顺序（频次从高到低）
+                    y=[freq for _, freq in top_positive],
+                    marker_color=green_colors,  # 颜色列表从深到浅
+                    hovertemplate='词语: %{x}<br>频次: %{y}<extra></extra>'
+                ))
+                
+                fig_pos_freq.update_layout(
+                    title="Top 10 Positive Words",
+                    xaxis_title="Words",
+                    yaxis_title="Frequency",
+                    showlegend=False,
+                    xaxis_tickangle=-45,
+                    height=400,
+                    plot_bgcolor='white',
+                    yaxis=dict(gridcolor='rgba(0,0,0,0.1)'),
+                    margin=dict(l=50, r=20, t=50, b=80)
+                )
+                st.plotly_chart(fig_pos_freq)
+        
+        with col2:
+            st.markdown("#### 消极评论关键词")
+            # 词云图
+            if negative_text:
+                fig_neg = create_wordcloud(negative_text, "Negative Reviews", 'negative')
+                st.pyplot(fig_neg)
+            
+            # 消极情感词频率直方图
+            top_negative = get_top_sentiment_words(negative_text, 'negative', 10)
+            if top_negative:
+                # 创建渐变红色（频次高的颜色更深）
+                n_bars = len(top_negative)
+                red_colors = [
+                    f'rgba({255 - i * 10}, {20 + i * 5}, {20 + i * 5}, {1 - i * 0.05})'  # 从深到浅的红色
+                    for i in range(n_bars)
+                ]
+                
+                fig_neg_freq = go.Figure()
+                fig_neg_freq.add_trace(go.Bar(
+                    x=[word for word, _ in top_negative],  # 不需要反转，保持原有顺序（频次从高到低）
+                    y=[freq for _, freq in top_negative],
+                    marker_color=red_colors,  # 颜色列表从深到浅
+                    hovertemplate='词语: %{x}<br>频次: %{y}<extra></extra>'
+                ))
+                
+                fig_neg_freq.update_layout(
+                    title="Top 10 Negative Words",
+                    xaxis_title="Words",
+                    yaxis_title="Frequency",
+                    showlegend=False,
+                    xaxis_tickangle=-45,
+                    height=400,
+                    plot_bgcolor='white',
+                    yaxis=dict(gridcolor='rgba(0,0,0,0.1)'),
+                    margin=dict(l=50, r=20, t=50, b=80)
+                )
+                st.plotly_chart(fig_neg_freq)
+        
+        # 3. 评分分布（移到最下面）
         st.markdown("### 评分分布")
         rating_counts = df['rating'].value_counts().sort_index()
         fig_rating = go.Figure()
@@ -606,62 +691,6 @@ def main():
         )
         
         st.plotly_chart(fig_rating, use_container_width=True)
-        
-        # 获取正面和负面评论的文本
-        positive_text = ' '.join(df[df['sentiment'] == 1.0]['review_content'].astype(str))
-        negative_text = ' '.join(df[df['sentiment'] == -1.0]['review_content'].astype(str))
-        
-        # 情感词分析部分
-        st.markdown("### 情感词分析")
-        
-        # 创建两列布局
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("#### 积极评论关键词")
-            # 词云图
-            if positive_text:
-                fig_pos = create_wordcloud(positive_text, "Positive Reviews", 'positive')
-                st.pyplot(fig_pos)
-            
-            # 积极情感词频率直方图
-            top_positive = get_top_sentiment_words(positive_text, 'positive', 10)
-            if top_positive:
-                fig_pos_freq = px.bar(
-                    x=[word for word, _ in top_positive],
-                    y=[freq for _, freq in top_positive],
-                    title="Top 10 Positive Words",
-                    labels={'x': 'Words', 'y': 'Frequency'}
-                )
-                fig_pos_freq.update_layout(
-                    showlegend=False,
-                    xaxis_tickangle=-45,
-                    height=400
-                )
-                st.plotly_chart(fig_pos_freq)
-        
-        with col2:
-            st.markdown("#### 消极评论关键词")
-            # 词云图
-            if negative_text:
-                fig_neg = create_wordcloud(negative_text, "Negative Reviews", 'negative')
-                st.pyplot(fig_neg)
-            
-            # 消极情感词频率直方图
-            top_negative = get_top_sentiment_words(negative_text, 'negative', 10)
-            if top_negative:
-                fig_neg_freq = px.bar(
-                    x=[word for word, _ in top_negative],
-                    y=[freq for _, freq in top_negative],
-                    title="Top 10 Negative Words",
-                    labels={'x': 'Words', 'y': 'Frequency'}
-                )
-                fig_neg_freq.update_layout(
-                    showlegend=False,
-                    xaxis_tickangle=-45,
-                    height=400
-                )
-                st.plotly_chart(fig_neg_freq)
     
     with tab3:
         st.subheader('Top Rated Products')
