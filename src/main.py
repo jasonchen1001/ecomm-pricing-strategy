@@ -49,6 +49,11 @@ def generate_report(df, recommendations, elasticity, model_score):
     elasticity_analyzer = PriceElasticityAnalyzer()
     elasticity_analyzer.elasticity = elasticity
     
+    # 计算情感分布
+    positive_ratio = (df['sentiment'] > 0).mean() * 100
+    negative_ratio = (df['sentiment'] < 0).mean() * 100
+    neutral_ratio = (df['sentiment'] == 0).mean() * 100
+    
     # 准备TOP5产品数据
     top5_products = recommendations.head()[['product_id', 'current_price', 'recommended_price', 'expected_change']]
     
@@ -74,8 +79,9 @@ def generate_report(df, recommendations, elasticity, model_score):
 - **价格弹性系数**: {elasticity:.2f}
 
 ## 2. 情感分析 💭
-- **正面评价占比**: {(df['sentiment'] > 0).mean()*100:.1f}%
-- **负面评价占比**: {(df['sentiment'] < 0).mean()*100:.1f}%
+- **正面评价占比**: {positive_ratio:.1f}%
+- **中性评价占比**: {neutral_ratio:.1f}%
+- **负面评价占比**: {negative_ratio:.1f}%
 
 ## 3. 定价模型表现 🎯
 - **模型准确率**: {model_score:.2%}

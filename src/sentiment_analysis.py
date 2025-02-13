@@ -4,6 +4,7 @@ import re
 import pandas as pd
 import matplotlib.pyplot as plt
 from nltk.corpus import stopwords
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
 import nltk
 
 class SentimentAnalyzer:
@@ -12,9 +13,14 @@ class SentimentAnalyzer:
         try:
             nltk.data.find('corpora/stopwords')
             nltk.download('punkt')
+            nltk.download('vader_lexicon')
         except LookupError:
             nltk.download('stopwords')
             nltk.download('punkt')
+            nltk.download('vader_lexicon')
+        
+        # 初始化VADER分析器
+        self.sia = SentimentIntensityAnalyzer()
         
         # 获取英文停用词
         self.stop_words = set(stopwords.words('english'))
@@ -27,9 +33,10 @@ class SentimentAnalyzer:
         })
     
     def analyze_text(self, text):
-        """分析单条评论的情感"""
+        """使用VADER分析文本情感"""
         try:
-            return TextBlob(str(text)).sentiment.polarity
+            scores = self.sia.polarity_scores(str(text))
+            return scores['compound']  # 返回复合得分 [-1, 1]
         except:
             return 0
     
@@ -39,40 +46,70 @@ class SentimentAnalyzer:
             try:
                 rating = float(row['rating'])
                 text = str(row['review_content'])
-                text_sentiment = TextBlob(text).sentiment.polarity
+                text_sentiment = self.analyze_text(text)
                 
-                # 评分分类
-                # >= 4.8: 直接判定为正面
-                # 3.0-4.7: 需要结合文本分析
-                # < 3.0: 直接判定为负面
-                if rating >= 4.8:
-                    return 1.0  # 直接返回正面
-                elif rating < 3.0:
-                    return -1.0  # 直接返回负面
+                # 1. 评分判定
+                if rating <= 3.0:  # 3星及以下
+                    return -1.0  # 直接判定为负面
                 
-                # 3.0-4.7分需要结合文本分析
-                if rating >= 4.0:
-                    # 4.0-4.7分
-                    if text_sentiment < -0.1:  # 降低负面阈值
+                # 2. 文本判定（对于3星以上的评论）
+                # 如果文本明显表达不满，即使评分高也判定为负面
+                if len(text) > 10:  # 确保评论有足够长度
+                    # 检查负面关键词
+                    negative_keywords = ['bad', 'poor', 'worst', 'terrible', 'waste', 
+                                      'not good', 'not worth', 'disappointed', 'broke',
+                                      'stopped working', 'cheap quality', 'don\'t buy']
+                    text_lower = text.lower()
+                    
+                    # 如果包含强烈的负面词，判定为负面
+                    if any(keyword in text_lower for keyword in negative_keywords):
                         return -1.0
-                    elif text_sentiment > 0.4:  # 提高正面阈值
+                    
+                    # 使用VADER的详细得分
+                    scores = self.sia.polarity_scores(text)
+                    
+                    # 如果负面得分显著，判定为负面
+                    if scores['neg'] > 0.2:  # 负面成分超过20%
+                        return -1.0
+                    
+                    # 中性判定：如果正面和负面成分都不明显
+                    if scores['pos'] < 0.2 and scores['neg'] < 0.1:
+                        return 0.0
+                
+                # 3. 评分和文本综合判定
+                if rating >= 4.5:  # 4.5星以上
+                    if text_sentiment > 0:  # 文本情感为正
+                        return 1.0
+                    else:
+                        return 0.0  # 文本不够正面，判为中性
+                elif rating >= 4.0:  # 4-4.5星
+                    if text_sentiment > 0.2:  # 需要明显的正面文本
                         return 1.0
                     else:
                         return 0.0
-                else:
-                    # 3.0-3.9分，倾向于负面
-                    if text_sentiment > 0.4:  # 需要很强的正面评价
+                else:  # 3-4星
+                    if text_sentiment > 0.4:  # 需要很强的正面文本
                         return 1.0
-                    elif text_sentiment < -0.1:  # 轻微负面就算负面
+                    elif text_sentiment < -0.2:  # 稍微负面就算负面
                         return -1.0
                     else:
-                        return -1.0  # 默认为负面
+                        return 0.0
                 
-            except:
+            except Exception as e:
+                print(f"Error in sentiment analysis: {e}")
                 return 0
 
         df['sentiment'] = df.apply(get_sentiment, axis=1)
+        
+        # 打印分布情况用于调试
+        sentiment_dist = df['sentiment'].value_counts(normalize=True) * 100
+        print("\nSentiment Distribution:")
+        print(f"Positive: {sentiment_dist.get(1.0, 0):.1f}%")
+        print(f"Neutral: {sentiment_dist.get(0.0, 0):.1f}%")
+        print(f"Negative: {sentiment_dist.get(-1.0, 0):.1f}%")
+        
         return df
+
     
     def get_frequent_words(self, texts, n=10, sentiment_type='positive'):
         """获取高频情感词"""
