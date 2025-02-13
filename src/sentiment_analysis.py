@@ -42,32 +42,31 @@ class SentimentAnalyzer:
                 text_sentiment = TextBlob(text).sentiment.polarity
                 
                 # 评分分类
-                # >= 4.5: 非常好
-                # 4.0-4.4: 好
-                # 3.0-3.9: 中性偏好
-                # 2.0-2.9: 中性偏差
-                # < 2.0: 差
-                if rating >= 4.5:
-                    rating_sentiment = 1.0
-                elif rating >= 4.0:
-                    rating_sentiment = 0.5
-                elif rating >= 3.0:
-                    rating_sentiment = 0.0
-                elif rating >= 2.0:
-                    rating_sentiment = -0.5
+                # >= 4.8: 直接判定为正面
+                # 3.0-4.7: 需要结合文本分析
+                # < 3.0: 直接判定为负面
+                if rating >= 4.8:
+                    return 1.0  # 直接返回正面
+                elif rating < 3.0:
+                    return -1.0  # 直接返回负面
+                
+                # 3.0-4.7分需要结合文本分析
+                if rating >= 4.0:
+                    # 4.0-4.7分
+                    if text_sentiment < -0.1:  # 降低负面阈值
+                        return -1.0
+                    elif text_sentiment > 0.4:  # 提高正面阈值
+                        return 1.0
+                    else:
+                        return 0.0
                 else:
-                    rating_sentiment = -1.0
-                
-                # 综合评分和文本情感
-                final_sentiment = (rating_sentiment * 0.7 + text_sentiment * 0.3)
-                
-                # 最终分类
-                if final_sentiment >= 0.5:  # 明显正面
-                    return 1
-                elif final_sentiment <= -0.3:  # 明显负面
-                    return -1
-                else:  # 中性
-                    return 0
+                    # 3.0-3.9分，倾向于负面
+                    if text_sentiment > 0.4:  # 需要很强的正面评价
+                        return 1.0
+                    elif text_sentiment < -0.1:  # 轻微负面就算负面
+                        return -1.0
+                    else:
+                        return -1.0  # 默认为负面
                 
             except:
                 return 0
