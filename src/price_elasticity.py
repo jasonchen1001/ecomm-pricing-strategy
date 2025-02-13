@@ -34,55 +34,87 @@ class PriceElasticityAnalyzer:
         X = X[mask]
         y = y[mask]
         
-        # 拟合模型
+        # 拟合模型: ln(Q) = α + β*ln(P)
         self.model.fit(X, y)
         
-        # 价格弹性系数是斜率的负值
+        # 价格弹性系数是斜率的负值: ε = -β
         self.elasticity = -self.model.coef_[0]
         return self.elasticity
     
-    def _point_elasticity(self, prices, quantities, segments):
+    def _point_elasticity(self, prices, quantities, segments=5):
         """点弹性方法"""
-        # 将数据转换为pandas Series
-        prices_series = pd.Series(prices)
-        quantities_series = pd.Series(quantities)
+        # 按价格排序
+        sorted_indices = np.argsort(prices)
+        prices = prices[sorted_indices]
+        quantities = quantities[sorted_indices]
         
-        # 将价格分成segments个区间
-        price_bins = pd.qcut(prices_series, segments)
-        avg_quantities = quantities_series.groupby(price_bins).mean()
-        avg_prices = prices_series.groupby(price_bins).mean()
-        
-        # 计算相邻区间的弹性
+        # 计算每个点的弹性
         elasticities = []
-        for i in range(len(avg_prices)-1):
-            p1, p2 = avg_prices.iloc[i:i+2]
-            q1, q2 = avg_quantities.iloc[i:i+2]
-            e = ((q2-q1)/q1) / ((p2-p1)/p1)
-            elasticities.append(e)
+        for i in range(1, len(prices)):
+            p1, p2 = prices[i-1], prices[i]
+            q1, q2 = quantities[i-1], quantities[i]
+            
+            # 避免除以零和极小值
+            if p1 < 1e-6 or p2 < 1e-6 or q1 < 1e-6 or q2 < 1e-6:
+                continue
+            
+            # 计算点弹性: (ΔQ/Q)/(ΔP/P)
+            price_change = (p2 - p1) / ((p1 + p2) / 2)  # 使用中点公式
+            quantity_change = (q2 - q1) / ((q1 + q2) / 2)
+            
+            if abs(price_change) > 1e-6:  # 避免除以接近零的值
+                point_elasticity = quantity_change / price_change
+                # 只保留合理范围内的弹性值
+                if abs(point_elasticity) < 10:  # 设置合理的上限
+                    elasticities.append(point_elasticity)
         
-        self.elasticity = np.mean(elasticities)
-        return self.elasticity
+        # 返回平均弹性
+        if elasticities:
+            # 使用中位数而不是平均值，避免极端值的影响
+            return np.median(elasticities)
+        return 0
     
-    def _arc_elasticity(self, prices, quantities, segments):
+    def _arc_elasticity(self, prices, quantities, segments=5):
         """弧弹性方法"""
-        # 将数据转换为pandas Series
-        prices_series = pd.Series(prices)
-        quantities_series = pd.Series(quantities)
+        # 计算相邻点之间的弧弹性
+        arc_elasticities = []
         
-        # 将价格分成segments个区间
-        price_bins = pd.qcut(prices_series, segments)
-        avg_quantities = quantities_series.groupby(price_bins).mean()
-        avg_prices = prices_series.groupby(price_bins).mean()
+        # 按价格排序
+        sorted_indices = np.argsort(prices)
+        prices = prices[sorted_indices]
+        quantities = quantities[sorted_indices]
         
-        elasticities = []
+        # 将数据分成segments段并计算每段的平均值
+        price_segments = np.array_split(prices, segments)
+        quantity_segments = np.array_split(quantities, segments)
+        
+        avg_prices = [np.mean(p) for p in price_segments]
+        avg_quantities = [np.mean(q) for q in quantity_segments]
+        
+        # 计算相邻段之间的弧弹性
         for i in range(len(avg_prices)-1):
-            p1, p2 = avg_prices.iloc[i:i+2]
-            q1, q2 = avg_quantities.iloc[i:i+2]
-            e = ((q2-q1)/(q2+q1)) / ((p2-p1)/(p2+p1))
-            elasticities.append(e)
+            p1, p2 = avg_prices[i], avg_prices[i+1]
+            q1, q2 = avg_quantities[i], avg_quantities[i+1]
+            
+            # 避免除以零和极小值
+            if min(p1, p2, q1, q2) < 1e-6:
+                continue
+            
+            # 计算弧弹性: ((Q2-Q1)/((Q1+Q2)/2))/((P2-P1)/((P1+P2)/2))
+            dq = (q2 - q1)
+            dp = (p2 - p1)
+            q_avg = (q1 + q2) / 2
+            p_avg = (p1 + p2) / 2
+            
+            if abs(dp/p_avg) > 1e-6:  # 避免除以接近零的值
+                arc_elasticity = (dq/q_avg)/(dp/p_avg)
+                if abs(arc_elasticity) < 10:  # 设置合理的上限
+                    arc_elasticities.append(arc_elasticity)
         
-        self.elasticity = np.mean(elasticities)
-        return self.elasticity
+        # 返回中位数弹性
+        if arc_elasticities:
+            return np.median(arc_elasticities)
+        return 0
     
     def plot_elasticity(self, prices, quantities, method='Log-Log', segments=5):
         """绘制价格-需求关系图"""

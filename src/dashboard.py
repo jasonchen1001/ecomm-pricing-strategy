@@ -10,6 +10,8 @@ import plotly.graph_objects as go
 import plotly.figure_factory as ff
 import numpy as np
 from sklearn.linear_model import LinearRegression
+from wordcloud import WordCloud
+from io import BytesIO
 
 # 设置页面配置
 st.set_page_config(
@@ -48,6 +50,28 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+def normalize_sizes(sizes, min_size=8, max_size=40):
+    """将词云字体大小归一化到合理范围"""
+    if len(sizes) == 0:
+        return []
+    min_val = min(sizes)
+    max_val = max(sizes)
+    if max_val == min_val:
+        return [max_size] * len(sizes)
+    return [min_size + (max_size - min_size) * (s - min_val) / (max_val - min_val) for s in sizes]
+
+def get_color_gradient(word=None, font_size=None, position=None, orientation=None, font_path=None, random_state=None):
+    """为词云生成渐变色"""
+    # 为积极评论使用绿色渐变
+    positive_colors = ['#90EE90', '#32CD32', '#228B22', '#006400']  # 浅绿到深绿
+    # 为消极评论使用红色渐变
+    negative_colors = ['#FFB6C1', '#FF6B6B', '#DC143C', '#8B0000']  # 浅红到深红
+    
+    # 根据字体大小选择颜色
+    colors = positive_colors if random_state.randint(2) == 0 else negative_colors
+    color_idx = int(font_size * (len(colors) - 1) / 100)
+    return colors[min(color_idx, len(colors) - 1)]
+
 def main():
     # 标题和介绍
     st.title('📊 Amazon Cable Products Pricing Analysis')
@@ -61,45 +85,26 @@ def main():
         df = load_data('amazon.csv')
         features = extract_features(df)
     
+    # 创建情感分析器实例并分析评论
+    sentiment_analyzer = SentimentAnalyzer()
+    df = sentiment_analyzer.analyze_reviews(df)  # 添加 sentiment 列
+    
+    # 创建价格弹性分析器实例
+    elasticity_analyzer = PriceElasticityAnalyzer()
+    
     # 侧边栏优化
     st.sidebar.image('https://upload.wikimedia.org/wikipedia/commons/4/4a/Amazon_icon.svg', width=100)
     st.sidebar.title('Analysis Controls')
     
-    # 在侧边栏添加价格弹性分析设置
+    # 简化侧边栏设置
     st.sidebar.markdown("---")
     st.sidebar.subheader("Price Elasticity Settings")
     
-    # 弹性阈值设置
-    elasticity_threshold = st.sidebar.slider(
-        'Elasticity Threshold',
-        min_value=0.1,
-        max_value=2.0,
-        value=0.5,
-        step=0.1,
-        help="Threshold to determine high/low price elasticity"
-    )
-    
-    # 添加价格区间选择
-    price_segments = st.sidebar.number_input(
-        'Price Segments',
-        min_value=2,
-        max_value=10,
-        value=5,
-        help="Number of price segments for elasticity analysis"
-    )
-    
-    # 添加计算方法选择
+    # 只保留弹性系数计算方法选择
     elasticity_method = st.sidebar.selectbox(
         'Calculation Method',
         ['Log-Log', 'Point', 'Arc'],
         help="Method to calculate price elasticity"
-    )
-    
-    # 添加时间窗口选择（如果有时间序列数据）
-    time_window = st.sidebar.selectbox(
-        'Analysis Period',
-        ['All Time', 'Last 30 Days', 'Last 90 Days', 'Last 180 Days'],
-        help="Time period for elasticity analysis"
     )
     
     # 添加更多筛选器
@@ -167,7 +172,9 @@ def main():
     tab1, tab2, tab3 = st.tabs(["Price Analysis", "Sentiment Analysis", "Product Rankings"])
     
     with tab1:
+        # Price Analysis 标签页
         col1, col2 = st.columns(2)
+        
         with col1:
             st.subheader('Price Distribution')
             fig = px.histogram(
@@ -176,164 +183,166 @@ def main():
                 nbins=30,
                 title='Price Distribution',
                 labels={'discounted_price': 'Price (₹)', 'count': 'Count'},
-                hover_data=['discounted_price']
+                hover_data=['discounted_price'],
+                opacity=0.7,  # 调整透明度
             )
+            
+            # 更新图表布局
             fig.update_layout(
+                bargap=0.2,  # 添加柱子之间的间隔
+                plot_bgcolor='white',  # 设置白色背景
                 showlegend=False,
-                hovermode='x',
-                hoverlabel=dict(bgcolor="white"),
+                xaxis=dict(
+                    title='Price (₹)',
+                    gridcolor='lightgrey',
+                    showgrid=True,
+                    showline=True,
+                    linewidth=1,
+                    linecolor='black',
+                    tickformat='₹%d'
+                ),
+                yaxis=dict(
+                    title='Number of Products',
+                    gridcolor='lightgrey',
+                    showgrid=True,
+                    showline=True,
+                    linewidth=1,
+                    linecolor='black'
+                ),
+                margin=dict(l=40, r=40, t=40, b=40)  # 调整边距
             )
+            
+            # 更新柱子颜色和边框
+            fig.update_traces(
+                marker_color='rgb(30, 144, 255)',  # 设置柱子颜色为深蓝色
+                marker_line_color='rgb(8, 48, 107)',  # 设置边框颜色
+                marker_line_width=1  # 设置边框宽度
+            )
+            
             st.plotly_chart(fig, use_container_width=True)
             
+            # 添加相关性分析
+            st.subheader('📊 Correlation Analysis')
+            correlation_matrix = filtered_df[
+                ['discounted_price', 'rating', 'rating_count', 'real_discount']
+            ].corr()
+            
+            labels = {
+                'discounted_price': 'Price',
+                'rating': 'Rating',
+                'rating_count': 'Reviews',
+                'real_discount': 'Discount'
+            }
+            
+            fig = go.Figure(data=go.Heatmap(
+                z=correlation_matrix,
+                x=list(labels.values()),
+                y=list(labels.values()),
+                text=correlation_matrix.round(2),
+                texttemplate='%{text}',
+                textfont={"size": 10},
+                hoverongaps=False,
+                hovertemplate='%{x} vs %{y}<br>Correlation: %{z:.2f}<extra></extra>',
+                colorscale='RdBu',
+                zmid=0
+            ))
+            
+            fig.update_layout(
+                title='Correlation Matrix',
+                height=400,
+                hoverlabel=dict(bgcolor="white"),
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+        
         with col2:
             st.subheader('Price Elasticity Analysis')
-            elasticity_analyzer = PriceElasticityAnalyzer()
+            
+            # 计算价格弹性系数
             elasticity = elasticity_analyzer.calculate_elasticity(
                 filtered_df['discounted_price'].values,
                 filtered_df['rating_count'].values,
-                method=elasticity_method,
-                segments=price_segments
+                method=elasticity_method
             )
             
-            # 显示分析结果
-            metrics_col1, metrics_col2, metrics_col3 = st.columns(3)
-            with metrics_col1:
-                st.metric('Price Elasticity', f"{elasticity:.2f}")
-            with metrics_col2:
-                st.metric('Threshold', f"{elasticity_threshold:.2f}")
-            with metrics_col3:
-                st.metric('Method', elasticity_method)
+            # 显示弹性系数及其含义
+            st.metric('Price Elasticity', f"{elasticity:.2f}")
             
-            # 根据用户设置的阈值判断
-            if elasticity < elasticity_threshold:
-                st.info(f"""
-                💡 低弹性市场特征 (< {elasticity_threshold:.2f}):
-                - 消费者对价格不敏感
-                - 具有较强的定价能力
-                - 建议策略：
-                  1. 可以适当提高价格
-                  2. 重点关注产品质量和品牌建设
-                  3. 通过差异化竞争而非价格战
+            if elasticity < 0.5:
+                st.success("""
+                **低价格弹性** (< 0.5):
+                - 消费者对价格变化不敏感
+                - 可以考虑适当提高价格
+                - 重点关注产品质量和品牌建设
                 """)
             else:
-                st.warning(f"""
-                ⚠️ 高弹性市场特征 (≥ {elasticity_threshold:.2f}):
-                - 消费者对价格敏感
-                - 价格竞争激烈
-                - 建议策略：
-                  1. 保持价格竞争力
-                  2. 密切关注竞品定价
-                  3. 考虑促销策略
+                st.warning("""
+                **高价格弹性** (≥ 0.5):
+                - 消费者对价格变化敏感
+                - 需要谨慎调整价格
+                - 关注竞品定价策略
                 """)
             
-            # Price vs Demand 图表部分
-            fig = go.Figure()
-            
-            # 添加基础散点图
-            fig.add_trace(go.Scatter(
-                x=filtered_df['discounted_price'],
-                y=filtered_df['rating_count'],
-                mode='markers',
-                name='Raw Data',
-                marker=dict(
-                    color='gray',
-                    opacity=0.5,
-                    size=8
-                ),
-                hovertemplate='<br>'.join([
-                    'Price: ₹%{x:.2f}',
-                    'Demand: %{y}',
-                    '<extra></extra>'
-                ])
-            ))
-            
-            # 根据不同方法添加趋势线
+            # 根据不同的计算方法显示不同的价格-需求关系图
             if elasticity_method == 'Log-Log':
-                # 对数回归拟合线
-                mask = (filtered_df['discounted_price'] > 0) & (filtered_df['rating_count'] > 0)
-                prices_clean = filtered_df['discounted_price'][mask]
-                quantities_clean = filtered_df['rating_count'][mask]
-                
-                X = np.log(prices_clean)
-                y = np.log(quantities_clean)
-                model = LinearRegression()
-                model.fit(X.values.reshape(-1, 1), y)
-                
-                # 生成预测线
-                x_range = np.linspace(X.min(), X.max(), 100)
-                y_pred = model.predict(x_range.reshape(-1, 1))
-                
-                fig.add_trace(go.Scatter(
-                    x=np.exp(x_range),
-                    y=np.exp(y_pred),
-                    mode='lines',
-                    name=f'Log-Log Fit (e={elasticity:.2f})',
-                    line=dict(color='red', width=2)
-                ))
-                
-            else:  # Point 或 Arc 方法
-                # 计算分段平均值
-                prices_series = pd.Series(filtered_df['discounted_price'])
-                quantities_series = pd.Series(filtered_df['rating_count'])
-                price_bins = pd.qcut(prices_series, price_segments)
-                avg_quantities = quantities_series.groupby(price_bins).mean()
-                avg_prices = prices_series.groupby(price_bins).mean()
-                
-                # 添加分段线和点
-                fig.add_trace(go.Scatter(
-                    x=avg_prices,
-                    y=avg_quantities,
-                    mode='lines+markers',
-                    name=f'{elasticity_method} Segments',
-                    line=dict(color='red', width=2),
-                    marker=dict(
-                        size=12,
-                        color='red',
-                        symbol='circle'
-                    ),
-                    hovertemplate='<br>'.join([
-                        'Segment Average:',
-                        'Price: ₹%{x:.2f}',
-                        'Demand: %{y:.0f}',
-                        '<extra></extra>'
-                    ])
-                ))
-                
-                # 添加段号标签
-                for i, (p, q) in enumerate(zip(avg_prices, avg_quantities)):
-                    fig.add_annotation(
-                        x=p,
-                        y=q,
-                        text=f'Segment {i+1}',
-                        showarrow=True,
-                        arrowhead=1
-                    )
-            
-            # 更新布局
-            fig.update_layout(
-                title=f'Price vs Demand ({elasticity_method} Method)',
-                xaxis_title='Price (₹)',
-                yaxis_title='Demand (Reviews)',
-                hovermode='closest',
-                showlegend=True,
-                height=500,
-                template='plotly_white',
-                hoverlabel=dict(bgcolor="white"),
-                margin=dict(t=50, l=50, r=50, b=50)
-            )
-            
-            # 添加网格线
-            fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
-            fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
+                # 对数转换后的散点图
+                fig = px.scatter(
+                    filtered_df,
+                    x=np.log(filtered_df['discounted_price']),
+                    y=np.log(filtered_df['rating_count']),
+                    title='Log-Log Price vs Demand',
+                    labels={
+                        'x': 'Log Price',
+                        'y': 'Log Demand'
+                    },
+                    trendline="ols"
+                )
+            elif elasticity_method == 'Point':
+                # 分段点弹性图
+                fig = px.scatter(
+                    filtered_df,
+                    x='discounted_price',
+                    y='rating_count',
+                    title='Point Price Elasticity',
+                    labels={
+                        'discounted_price': 'Price (₹)',
+                        'rating_count': 'Demand (Reviews)'
+                    }
+                )
+                # 添加分段点弹性线
+                sorted_df = filtered_df.sort_values('discounted_price')
+                segments = np.array_split(sorted_df, 5)
+                for segment in segments:
+                    fig.add_trace(go.Scatter(
+                        x=segment['discounted_price'],
+                        y=segment['rating_count'],
+                        mode='lines',
+                        name=f'Segment {len(fig.data)}'
+                    ))
+            else:  # Arc
+                # 弧弹性图
+                fig = px.scatter(
+                    filtered_df,
+                    x='discounted_price',
+                    y='rating_count',
+                    title='Arc Price Elasticity',
+                    labels={
+                        'discounted_price': 'Price (₹)',
+                        'rating_count': 'Demand (Reviews)'
+                    },
+                    trendline="lowess"  # 使用局部加权回归
+                )
             
             st.plotly_chart(fig, use_container_width=True)
     
     with tab2:
-        st.subheader('Customer Sentiment Analysis')
-        sentiment_analyzer = SentimentAnalyzer()
-        filtered_df = sentiment_analyzer.analyze_reviews(filtered_df)
+        st.header('📝 Review Analysis')
+        
+        # 计算情感统计
+        filtered_df = df.copy()  # 使用包含 sentiment 列的数据
         
         col1, col2 = st.columns(2)
+        
         with col1:
             positive_ratio = (filtered_df['sentiment'] > 0).mean() * 100
             st.metric(
@@ -341,7 +350,7 @@ def main():
                 f"{positive_ratio:.1f}%",
                 delta=f"{positive_ratio - 50:.1f}% from neutral"
             )
-            
+        
         with col2:
             negative_ratio = (filtered_df['sentiment'] < 0).mean() * 100
             st.metric(
@@ -351,15 +360,143 @@ def main():
                 delta_color="inverse"
             )
         
-        # 添加词云图
-        st.subheader('Common Words in Reviews')
+        # 添加词云分析
+        st.header("📊 评论词云分析")
+        
+        # 创建两列布局
         col1, col2 = st.columns(2)
+        
+        # 生成积极评论词云
         with col1:
-            st.write("Positive Reviews Word Cloud")
-            # 这里可以添加词云图的代码
+            st.subheader("积极评论词云")
+            positive_reviews = filtered_df[filtered_df['sentiment'] > 0]['review_content'].fillna('').str.cat(sep=' ')
+            if positive_reviews:
+                # 生成词云
+                wordcloud = WordCloud(
+                    width=800, 
+                    height=400,
+                    background_color='white',
+                    max_words=100,
+                    colormap='YlGn'  # 使用绿色系配色
+                ).generate(positive_reviews)
+                
+                # 显示词云图
+                fig, ax = plt.subplots(figsize=(10, 5))
+                ax.imshow(wordcloud, interpolation='bilinear')
+                ax.axis('off')
+                st.pyplot(fig)
+                plt.close()
+        
+        # 生成消极评论词云
         with col2:
-            st.write("Negative Reviews Word Cloud")
-            # 这里可以添加词云图的代码
+            st.subheader("消极评论词云")
+            negative_reviews = filtered_df[filtered_df['sentiment'] < 0]['review_content'].fillna('').str.cat(sep=' ')
+            if negative_reviews:
+                # 生成词云
+                wordcloud = WordCloud(
+                    width=800, 
+                    height=400,
+                    background_color='white',
+                    max_words=100,
+                    colormap='RdPu'  # 使用红色系配色
+                ).generate(negative_reviews)
+                
+                # 显示词云图
+                fig, ax = plt.subplots(figsize=(10, 5))
+                ax.imshow(wordcloud, interpolation='bilinear')
+                ax.axis('off')
+                st.pyplot(fig)
+                plt.close()
+        
+        # 显示高频词统计
+        st.subheader("📈 高频词统计")
+        col3, col4 = st.columns(2)
+        
+        with col3:
+            st.markdown("### 积极评论高频词")
+            positive_freq = pd.Series(dict(sentiment_analyzer.get_frequent_words(
+                df[df['sentiment'] > 0]['review_content'],
+                sentiment_type='positive'
+            )))
+            
+            # 创建积极评论高频词柱状图
+            fig = go.Figure()
+            fig.add_trace(go.Bar(
+                x=positive_freq.head(10).index,
+                y=positive_freq.head(10).values,
+                marker_color='rgb(50, 205, 50)',  # 设置为绿色
+                marker_line_color='rgb(25, 102, 25)',
+                marker_line_width=1,
+                opacity=0.7
+            ))
+            
+            fig.update_layout(
+                title='Top 10 Words in Positive Reviews',
+                plot_bgcolor='white',
+                bargap=0.3,
+                showlegend=False,
+                xaxis=dict(
+                    title='Words',
+                    gridcolor='lightgrey',
+                    showgrid=False,
+                    showline=True,
+                    linewidth=1,
+                    linecolor='black'
+                ),
+                yaxis=dict(
+                    title='Frequency',
+                    gridcolor='lightgrey',
+                    showgrid=True,
+                    showline=True,
+                    linewidth=1,
+                    linecolor='black'
+                ),
+                margin=dict(l=40, r=40, t=40, b=40)
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            
+        with col4:
+            st.markdown("### 消极评论高频词")
+            negative_freq = pd.Series(dict(sentiment_analyzer.get_frequent_words(
+                df[df['sentiment'] < 0]['review_content'],
+                sentiment_type='negative'
+            )))
+            
+            # 创建消极评论高频词柱状图
+            fig = go.Figure()
+            fig.add_trace(go.Bar(
+                x=negative_freq.head(10).index,
+                y=negative_freq.head(10).values,
+                marker_color='rgb(255, 99, 71)',  # 设置为红色
+                marker_line_color='rgb(139, 26, 26)',
+                marker_line_width=1,
+                opacity=0.7
+            ))
+            
+            fig.update_layout(
+                title='Top 10 Words in Negative Reviews',
+                plot_bgcolor='white',
+                bargap=0.3,
+                showlegend=False,
+                xaxis=dict(
+                    title='Words',
+                    gridcolor='lightgrey',
+                    showgrid=False,
+                    showline=True,
+                    linewidth=1,
+                    linecolor='black'
+                ),
+                yaxis=dict(
+                    title='Frequency',
+                    gridcolor='lightgrey',
+                    showgrid=True,
+                    showline=True,
+                    linewidth=1,
+                    linecolor='black'
+                ),
+                margin=dict(l=40, r=40, t=40, b=40)
+            )
+            st.plotly_chart(fig, use_container_width=True)
     
     with tab3:
         st.subheader('Top Rated Products')
@@ -389,42 +526,8 @@ def main():
             use_container_width=True
         )
     
-    # 相关性分析使用 Plotly
-    st.header('📊 Correlation Analysis')
-    correlation_matrix = filtered_df[
-        ['discounted_price', 'rating', 'rating_count', 'real_discount']
-    ].corr()
-    
-    # 使用 Plotly 热力图
-    labels = {
-        'discounted_price': 'Price',
-        'rating': 'Rating',
-        'rating_count': 'Reviews',
-        'real_discount': 'Discount'
-    }
-    
-    fig = go.Figure(data=go.Heatmap(
-        z=correlation_matrix,
-        x=list(labels.values()),
-        y=list(labels.values()),
-        text=correlation_matrix.round(2),
-        texttemplate='%{text}',
-        textfont={"size": 10},
-        hoverongaps=False,
-        hovertemplate='%{x} vs %{y}<br>Correlation: %{z:.2f}<extra></extra>',
-        colorscale='RdBu',
-        zmid=0
-    ))
-    
-    fig.update_layout(
-        title='Correlation Matrix',
-        height=500,
-        hoverlabel=dict(bgcolor="white"),
-    )
-    
-    st.plotly_chart(fig, use_container_width=True)
-    
-    # 添加页脚
+    # 移除页面底部的相关性矩阵
+    # 只保留页脚
     st.markdown("""---""")
     st.markdown("""
         <div style='text-align: center'>
