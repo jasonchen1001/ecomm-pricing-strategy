@@ -12,6 +12,8 @@ import numpy as np
 from sklearn.linear_model import LinearRegression
 from wordcloud import WordCloud
 from io import BytesIO
+from nltk.corpus import opinion_lexicon
+import nltk
 
 # 设置页面配置
 st.set_page_config(
@@ -50,6 +52,12 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# 确保下载必要的词典
+try:
+    nltk.data.find('corpora/opinion_lexicon')
+except LookupError:
+    nltk.download('opinion_lexicon')
+
 def normalize_sizes(sizes, min_size=8, max_size=40):
     """将词云字体大小归一化到合理范围"""
     if len(sizes) == 0:
@@ -72,6 +80,182 @@ def get_color_gradient(word=None, font_size=None, position=None, orientation=Non
     color_idx = int(font_size * (len(colors) - 1) / 100)
     return colors[min(color_idx, len(colors) - 1)]
 
+def create_wordcloud(text, title, sentiment_type='positive'):
+    """创建词云图"""
+    # 获取NLTK的情感词典
+    positive_words = set(opinion_lexicon.positive())
+    negative_words = set(opinion_lexicon.negative())
+    
+    # 产品评论特定的积极词
+    product_specific_positive = {
+        'affordable', 'worth', 'sturdy', 'durable', 'reliable', 
+        'fast', 'quick', 'solid', 'perfect', 'excellent',
+        'strong', 'stable', 'premium', 'professional', 'recommended',
+        'satisfied', 'quality', 'great', 'nice', 'good',
+        'convenient', 'efficient', 'effective', 'impressive'
+    }
+    
+    # 产品评论特定的消极词
+    product_specific_negative = {
+        'defective', 'faulty', 'broken', 'useless',
+        'disappointing', 'terrible', 'horrible', 'awful',
+        'worthless', 'poor-quality', 'unreliable', 'unstable',
+        'overpriced', 'ineffective', 'malfunctioning',
+        'negative', 'strain'  
+    }
+    
+    # 需要移除的歧义词
+    ambiguous_words = {
+        'cheap',      # 可能表示便宜(积极)或劣质(消极)
+        'quality',    # 可能表示便宜(积极)或劣质(消极)
+        'hard',       # 可能表示坚硬(积极)或困难(消极)
+        'emergency',  # 描述情况而非产品质量
+        'blame',      # 描述行为而非产品
+        'basic',      # 可能是中性描述
+        'simple',     # 可能是积极或消极
+        'just',       # 通常是中性词
+        'want',       # 意愿描述
+        'need',       # 需求描述
+        'try',        # 行为描述
+        'return',     # 行为描述
+        'cost',       # 价格描述
+        'price',      # 价格描述
+        'charge'      # 可能是充电或收费
+    }
+    
+    # 停用词
+    stop_words = {
+        'issues', 'issue', 'problem', 'problems',  # 中性词
+        'like', 'well', 'better', 'works', 'work',  # 中性/描述性词
+        'cable', 'charger', 'wire', 'cord', 'adapter',  # 产品相关词
+        'time', 'month', 'day', 'year', 'week',  # 时间相关词
+        'amazon', 'product', 'purchase', 'bought', 'order',  # 购买相关词
+        'use', 'using', 'used', 'usage',  # 使用相关词
+        'one', 'two', 'three', 'first', 'second',  # 数字相关词
+        'the', 'and', 'for', 'that', 'this', 'with',  # 常见停用词
+        'was', 'is', 'are', 'were', 'been', 'be', 'have'
+    }
+    
+    # 更新情感词典
+    positive_words.update(product_specific_positive)
+    negative_words.update(product_specific_negative)
+    
+    # 移除歧义词和停用词
+    positive_words = positive_words - ambiguous_words - stop_words
+    negative_words = negative_words - ambiguous_words - stop_words
+    
+    # 分词并过滤
+    words = text.lower().split()
+    if sentiment_type == 'positive':
+        filtered_words = [word for word in words 
+                         if word in positive_words]
+        colormap = 'YlGn'
+    else:
+        filtered_words = [word for word in words 
+                         if word in negative_words]
+        colormap = 'RdPu'
+    
+    # 如果没有找到情感词，返回空图
+    if not filtered_words:
+        fig, ax = plt.subplots(figsize=(10, 5))
+        ax.text(0.5, 0.5, 'No significant sentiment words found',
+                ha='center', va='center')
+        ax.axis('off')
+        return fig
+    
+    # 生成词云
+    text = ' '.join(filtered_words)
+    wordcloud = WordCloud(
+        width=800,
+        height=400,
+        background_color='white',
+        colormap=colormap,
+        max_words=30,
+        min_font_size=12,
+        max_font_size=160,
+        prefer_horizontal=0.7
+    ).generate(text)
+    
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.imshow(wordcloud, interpolation='bilinear')
+    ax.axis('off')
+    ax.set_title(title)
+    return fig
+
+def get_top_sentiment_words(text, sentiment_type='positive', n=10):
+    """获取前N个最常见的情感词"""
+    # 获取情感词典
+    positive_words = set(opinion_lexicon.positive())
+    negative_words = set(opinion_lexicon.negative())
+    
+    # 产品评论特定的积极词
+    product_specific_positive = {
+        'affordable', 'worth', 'sturdy', 'durable', 'reliable', 
+        'fast', 'quick', 'solid', 'perfect', 'excellent',
+        'strong', 'stable', 'premium', 'professional', 'recommended',
+        'satisfied', 'quality', 'great', 'nice', 'good',
+        'convenient', 'efficient', 'effective', 'impressive'
+    }
+    
+    # 产品评论特定的消极词（只保留明确的负面词）
+    product_specific_negative = {
+        'defective', 'faulty', 'broken', 'useless',
+        'disappointing', 'terrible', 'horrible', 'awful',
+        'worthless', 'poor-quality', 'unreliable', 'unstable',
+        'overpriced', 'ineffective', 'malfunctioning'
+    }
+    
+    # 需要从情感词典中移除的歧义词
+    ambiguous_words = {
+        'quality',    # 可能表示便宜(积极)或劣质(消极)
+        'cheap',      # 可能表示便宜(积极)或劣质(消极)
+        'hard',       # 可能表示坚硬(积极)或困难(消极)
+        'emergency',  # 描述情况而非产品质量
+        'blame',      # 描述行为而非产品
+        'basic',      # 可能是中性描述
+        'simple',     # 可能是积极或消极
+        'just',       # 通常是中性词
+        'want',       # 意愿描述
+        'need',       # 需求描述
+        'try',        # 行为描述
+        'return',     # 行为描述
+        'cost',       # 价格描述
+        'price',      # 价格描述
+        'charge'      # 可能是充电或收费
+    }
+    
+    # 额外的停用词
+    extra_stop_words = {
+        'issues', 'issue', 'problem', 'problems',  # 中性词
+        'like', 'well', 'better', 'works', 'work',  # 中性/描述性词
+        'cable', 'charger', 'wire', 'cord', 'adapter',  # 产品相关词
+        'time', 'month', 'day', 'year', 'week',  # 时间相关词
+        'amazon', 'product', 'purchase', 'bought', 'order',  # 购买相关词
+        'use', 'using', 'used', 'usage',  # 使用相关词
+        'one', 'two', 'three', 'first', 'second',  # 数字相关词
+    }
+    
+    # 更新情感词典
+    positive_words.update(product_specific_positive)
+    negative_words.update(product_specific_negative)
+    
+    # 移除所有歧义词和停用词
+    positive_words = positive_words - ambiguous_words - extra_stop_words
+    negative_words = negative_words - ambiguous_words - extra_stop_words
+    
+    # 分词并过滤
+    words = text.lower().split()
+    word_freq = {}
+    target_words = positive_words if sentiment_type == 'positive' else negative_words
+    
+    for word in words:
+        if word in target_words:
+            word_freq[word] = word_freq.get(word, 0) + 1
+    
+    # 获取前N个最常见的词
+    top_words = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)[:n]
+    return top_words
+
 def main():
     # 标题和介绍
     st.title('📊 Amazon Cable Products Pricing Analysis')
@@ -82,12 +266,7 @@ def main():
     
     # 加载数据时显示进度条
     with st.spinner('Loading data...'):
-        df = load_data('amazon.csv')
-        features = extract_features(df)
-    
-    # 创建情感分析器实例并分析评论
-    sentiment_analyzer = SentimentAnalyzer()
-    df = sentiment_analyzer.analyze_reviews(df)  # 添加 sentiment 列
+        df, features, analyzer = load_cached_data()
     
     # 创建价格弹性分析器实例
     elasticity_analyzer = PriceElasticityAnalyzer()
@@ -338,173 +517,151 @@ def main():
     with tab2:
         st.header('📝 Review Analysis')
         
-        # 计算情感统计
-        filtered_df = df.copy()
+        # 显示情感分布指标
+        total_reviews = len(df)
+        positive_count = (df['sentiment'] == 1.0).sum()
+        neutral_count = (df['sentiment'] == 0.0).sum()
+        negative_count = (df['sentiment'] == -1.0).sum()
         
-        col1, col2, col3 = st.columns(3)
+        positive_ratio = (positive_count / total_reviews) * 100
+        neutral_ratio = (neutral_count / total_reviews) * 100
+        negative_ratio = (negative_count / total_reviews) * 100
         
-        with col1:
-            positive_ratio = (filtered_df['rating'] > 3).mean() * 100
+        # 使用列布局显示指标
+        st.markdown("### 评论情感分布")
+        metric_cols = st.columns(3)
+        
+        with metric_cols[0]:
             st.metric(
-                'Positive Reviews',
+                "积极评论",
                 f"{positive_ratio:.1f}%",
-                delta=f"{positive_ratio - 33.3:.1f}% from balanced"
+                f"{positive_count} 条评论"
             )
         
-        with col2:
-            neutral_ratio = (filtered_df['rating'] == 3).mean() * 100
+        with metric_cols[1]:
             st.metric(
-                'Neutral Reviews',
+                "中性评论",
                 f"{neutral_ratio:.1f}%",
-                delta=f"{neutral_ratio - 33.3:.1f}% from balanced"
+                f"{neutral_count} 条评论"
             )
         
-        with col3:
-            negative_ratio = (filtered_df['rating'] < 3).mean() * 100
+        with metric_cols[2]:
             st.metric(
-                'Negative Reviews',
+                "消极评论",
                 f"{negative_ratio:.1f}%",
-                delta=f"{negative_ratio - 33.3:.1f}% from balanced",
-                delta_color="inverse"
+                f"{negative_count} 条评论"
             )
         
-        # 添加词云分析
-        st.header("📊 评论词云分析")
+        # 评分分布
+        st.markdown("### 评分分布")
+        rating_counts = df['rating'].value_counts().sort_index()
+        fig_rating = go.Figure()
+        
+        # 添加柱状图
+        fig_rating.add_trace(go.Bar(
+            x=rating_counts.index,
+            y=rating_counts.values,
+            marker_color='rgb(0, 123, 255)',
+            hovertemplate='评分: %{x}<br>数量: %{y}<extra></extra>'
+        ))
+        
+        # 更新布局
+        fig_rating.update_layout(
+            title={
+                'text': '评分分布',
+                'y': 0.9,
+                'x': 0.5,
+                'xanchor': 'center',
+                'yanchor': 'top'
+            },
+            xaxis=dict(
+                title='评分',
+                tickmode='array',
+                ticktext=['1', '2', '3', '4', '5'],
+                tickvals=[1, 2, 3, 4, 5],
+                tickangle=0,
+                gridcolor='rgba(0,0,0,0.1)',
+                showgrid=True
+            ),
+            yaxis=dict(
+                title='评论数量',
+                gridcolor='rgba(0,0,0,0.1)',
+                showgrid=True
+            ),
+            plot_bgcolor='white',
+            showlegend=False,
+            height=400,
+            margin=dict(l=50, r=50, t=80, b=50),
+            bargap=0.2
+        )
+        
+        # 添加平均评分标注
+        avg_rating = df['rating'].mean()
+        fig_rating.add_vline(
+            x=avg_rating,
+            line_dash="dash",
+            line_color="red",
+            annotation_text=f"平均评分: {avg_rating:.2f}",
+            annotation_position="top"
+        )
+        
+        st.plotly_chart(fig_rating, use_container_width=True)
+        
+        # 获取正面和负面评论的文本
+        positive_text = ' '.join(df[df['sentiment'] == 1.0]['review_content'].astype(str))
+        negative_text = ' '.join(df[df['sentiment'] == -1.0]['review_content'].astype(str))
+        
+        # 情感词分析部分
+        st.markdown("### 情感词分析")
         
         # 创建两列布局
         col1, col2 = st.columns(2)
         
-        # 生成积极评论词云
         with col1:
-            st.subheader("积极评论词云")
-            positive_reviews = filtered_df[filtered_df['rating'] > 3]['review_content'].fillna('').str.cat(sep=' ')
-            if positive_reviews:
-                # 生成词云
-                wordcloud = WordCloud(
-                    width=800, 
-                    height=400,
-                    background_color='white',
-                    max_words=100,
-                    colormap='YlGn'  # 使用绿色系配色
-                ).generate(positive_reviews)
-                
-                # 显示词云图
-                fig, ax = plt.subplots(figsize=(10, 5))
-                ax.imshow(wordcloud, interpolation='bilinear')
-                ax.axis('off')
-                st.pyplot(fig)
-                plt.close()
+            st.markdown("#### 积极评论关键词")
+            # 词云图
+            if positive_text:
+                fig_pos = create_wordcloud(positive_text, "Positive Reviews", 'positive')
+                st.pyplot(fig_pos)
+            
+            # 积极情感词频率直方图
+            top_positive = get_top_sentiment_words(positive_text, 'positive', 10)
+            if top_positive:
+                fig_pos_freq = px.bar(
+                    x=[word for word, _ in top_positive],
+                    y=[freq for _, freq in top_positive],
+                    title="Top 10 Positive Words",
+                    labels={'x': 'Words', 'y': 'Frequency'}
+                )
+                fig_pos_freq.update_layout(
+                    showlegend=False,
+                    xaxis_tickangle=-45,
+                    height=400
+                )
+                st.plotly_chart(fig_pos_freq)
         
-        # 生成消极评论词云
         with col2:
-            st.subheader("消极评论词云")
-            negative_reviews = filtered_df[filtered_df['rating'] < 3]['review_content'].fillna('').str.cat(sep=' ')
-            if negative_reviews:
-                # 生成词云
-                wordcloud = WordCloud(
-                    width=800, 
-                    height=400,
-                    background_color='white',
-                    max_words=100,
-                    colormap='RdPu'  # 使用红色系配色
-                ).generate(negative_reviews)
-                
-                # 显示词云图
-                fig, ax = plt.subplots(figsize=(10, 5))
-                ax.imshow(wordcloud, interpolation='bilinear')
-                ax.axis('off')
-                st.pyplot(fig)
-                plt.close()
-        
-        # 显示高频词统计
-        st.subheader("📈 高频词统计")
-        col3, col4 = st.columns(2)
-        
-        with col3:
-            st.markdown("### 积极评论高频词")
-            positive_freq = pd.Series(dict(sentiment_analyzer.get_frequent_words(
-                df[df['rating'] > 3]['review_content'],
-                sentiment_type='positive'
-            )))
+            st.markdown("#### 消极评论关键词")
+            # 词云图
+            if negative_text:
+                fig_neg = create_wordcloud(negative_text, "Negative Reviews", 'negative')
+                st.pyplot(fig_neg)
             
-            # 创建积极评论高频词柱状图
-            fig = go.Figure()
-            fig.add_trace(go.Bar(
-                x=positive_freq.head(10).index,
-                y=positive_freq.head(10).values,
-                marker_color='rgb(50, 205, 50)',  # 设置为绿色
-                marker_line_color='rgb(25, 102, 25)',
-                marker_line_width=1,
-                opacity=0.7
-            ))
-            
-            fig.update_layout(
-                title='Top 10 Words in Positive Reviews',
-                plot_bgcolor='white',
-                bargap=0.3,
-                showlegend=False,
-                xaxis=dict(
-                    title='Words',
-                    gridcolor='lightgrey',
-                    showgrid=False,
-                    showline=True,
-                    linewidth=1,
-                    linecolor='black'
-                ),
-                yaxis=dict(
-                    title='Frequency',
-                    gridcolor='lightgrey',
-                    showgrid=True,
-                    showline=True,
-                    linewidth=1,
-                    linecolor='black'
-                ),
-                margin=dict(l=40, r=40, t=40, b=40)
-            )
-            st.plotly_chart(fig, use_container_width=True)
-            
-        with col4:
-            st.markdown("### 消极评论高频词")
-            negative_freq = pd.Series(dict(sentiment_analyzer.get_frequent_words(
-                df[df['rating'] < 3]['review_content'],
-                sentiment_type='negative'
-            )))
-            
-            # 创建消极评论高频词柱状图
-            fig = go.Figure()
-            fig.add_trace(go.Bar(
-                x=negative_freq.head(10).index,
-                y=negative_freq.head(10).values,
-                marker_color='rgb(255, 99, 71)',  # 设置为红色
-                marker_line_color='rgb(139, 26, 26)',
-                marker_line_width=1,
-                opacity=0.7
-            ))
-            
-            fig.update_layout(
-                title='Top 10 Words in Negative Reviews',
-                plot_bgcolor='white',
-                bargap=0.3,
-                showlegend=False,
-                xaxis=dict(
-                    title='Words',
-                    gridcolor='lightgrey',
-                    showgrid=False,
-                    showline=True,
-                    linewidth=1,
-                    linecolor='black'
-                ),
-                yaxis=dict(
-                    title='Frequency',
-                    gridcolor='lightgrey',
-                    showgrid=True,
-                    showline=True,
-                    linewidth=1,
-                    linecolor='black'
-                ),
-                margin=dict(l=40, r=40, t=40, b=40)
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            # 消极情感词频率直方图
+            top_negative = get_top_sentiment_words(negative_text, 'negative', 10)
+            if top_negative:
+                fig_neg_freq = px.bar(
+                    x=[word for word, _ in top_negative],
+                    y=[freq for _, freq in top_negative],
+                    title="Top 10 Negative Words",
+                    labels={'x': 'Words', 'y': 'Frequency'}
+                )
+                fig_neg_freq.update_layout(
+                    showlegend=False,
+                    xaxis_tickangle=-45,
+                    height=400
+                )
+                st.plotly_chart(fig_neg_freq)
     
     with tab3:
         st.subheader('Top Rated Products')
@@ -542,6 +699,18 @@ def main():
             <p>Made with ❤️ by Yanzhen Chen | Data last updated: 2025</p>
         </div>
     """, unsafe_allow_html=True)
+
+# 加载数据
+@st.cache_data
+def load_cached_data():
+    df = load_data('amazon.csv')
+    features = extract_features(df)
+    
+    # 情感分析
+    analyzer = SentimentAnalyzer()
+    df = analyzer.analyze_reviews(df)
+    
+    return df, features, analyzer
 
 if __name__ == '__main__':
     main() 
