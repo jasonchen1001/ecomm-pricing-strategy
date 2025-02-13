@@ -22,9 +22,19 @@ def main():
     )
     
     # 3. 情感分析
-    print("正在进行情感分析...")
+    print("\n=== 开始情感分析 ===")
+    print("正在初始化情感分析器...")
     sentiment_analyzer = SentimentAnalyzer()
+    
+    # 为了测试，先只分析前5条评论
+    print("\n测试前5条评论的情感分析：")
+    test_df = df.head()
+    test_df = sentiment_analyzer.analyze_reviews(test_df)
+    
+    # 如果测试成功，再分析全部评论
+    print("\n开始分析所有评论...")
     df = sentiment_analyzer.analyze_reviews(df)
+    print("=== 情感分析完成 ===\n")
     
     # 4. 动态定价模型
     print("正在构建定价模型...")
