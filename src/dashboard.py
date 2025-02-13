@@ -339,24 +339,32 @@ def main():
         st.header('📝 Review Analysis')
         
         # 计算情感统计
-        filtered_df = df.copy()  # 使用包含 sentiment 列的数据
+        filtered_df = df.copy()
         
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         
         with col1:
-            positive_ratio = (filtered_df['sentiment'] > 0).mean() * 100
+            positive_ratio = (filtered_df['rating'] > 3).mean() * 100
             st.metric(
                 'Positive Reviews',
                 f"{positive_ratio:.1f}%",
-                delta=f"{positive_ratio - 50:.1f}% from neutral"
+                delta=f"{positive_ratio - 33.3:.1f}% from balanced"
             )
         
         with col2:
-            negative_ratio = (filtered_df['sentiment'] < 0).mean() * 100
+            neutral_ratio = (filtered_df['rating'] == 3).mean() * 100
+            st.metric(
+                'Neutral Reviews',
+                f"{neutral_ratio:.1f}%",
+                delta=f"{neutral_ratio - 33.3:.1f}% from balanced"
+            )
+        
+        with col3:
+            negative_ratio = (filtered_df['rating'] < 3).mean() * 100
             st.metric(
                 'Negative Reviews',
                 f"{negative_ratio:.1f}%",
-                delta=f"{negative_ratio - 50:.1f}% from neutral",
+                delta=f"{negative_ratio - 33.3:.1f}% from balanced",
                 delta_color="inverse"
             )
         
@@ -369,7 +377,7 @@ def main():
         # 生成积极评论词云
         with col1:
             st.subheader("积极评论词云")
-            positive_reviews = filtered_df[filtered_df['sentiment'] > 0]['review_content'].fillna('').str.cat(sep=' ')
+            positive_reviews = filtered_df[filtered_df['rating'] > 3]['review_content'].fillna('').str.cat(sep=' ')
             if positive_reviews:
                 # 生成词云
                 wordcloud = WordCloud(
@@ -390,7 +398,7 @@ def main():
         # 生成消极评论词云
         with col2:
             st.subheader("消极评论词云")
-            negative_reviews = filtered_df[filtered_df['sentiment'] < 0]['review_content'].fillna('').str.cat(sep=' ')
+            negative_reviews = filtered_df[filtered_df['rating'] < 3]['review_content'].fillna('').str.cat(sep=' ')
             if negative_reviews:
                 # 生成词云
                 wordcloud = WordCloud(
@@ -415,7 +423,7 @@ def main():
         with col3:
             st.markdown("### 积极评论高频词")
             positive_freq = pd.Series(dict(sentiment_analyzer.get_frequent_words(
-                df[df['sentiment'] > 0]['review_content'],
+                df[df['rating'] > 3]['review_content'],
                 sentiment_type='positive'
             )))
             
@@ -458,7 +466,7 @@ def main():
         with col4:
             st.markdown("### 消极评论高频词")
             negative_freq = pd.Series(dict(sentiment_analyzer.get_frequent_words(
-                df[df['sentiment'] < 0]['review_content'],
+                df[df['rating'] < 3]['review_content'],
                 sentiment_type='negative'
             )))
             

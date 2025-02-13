@@ -35,12 +35,50 @@ class SentimentAnalyzer:
     
     def analyze_reviews(self, df):
         """分析所有评论"""
-        df['sentiment'] = df['review_content'].apply(self.analyze_text)
+        def get_sentiment(row):
+            try:
+                rating = float(row['rating'])
+                text = str(row['review_content'])
+                text_sentiment = TextBlob(text).sentiment.polarity
+                
+                # 评分分类
+                # >= 4.5: 非常好
+                # 4.0-4.4: 好
+                # 3.0-3.9: 中性偏好
+                # 2.0-2.9: 中性偏差
+                # < 2.0: 差
+                if rating >= 4.5:
+                    rating_sentiment = 1.0
+                elif rating >= 4.0:
+                    rating_sentiment = 0.5
+                elif rating >= 3.0:
+                    rating_sentiment = 0.0
+                elif rating >= 2.0:
+                    rating_sentiment = -0.5
+                else:
+                    rating_sentiment = -1.0
+                
+                # 综合评分和文本情感
+                final_sentiment = (rating_sentiment * 0.7 + text_sentiment * 0.3)
+                
+                # 最终分类
+                if final_sentiment >= 0.5:  # 明显正面
+                    return 1
+                elif final_sentiment <= -0.3:  # 明显负面
+                    return -1
+                else:  # 中性
+                    return 0
+                
+            except:
+                return 0
+
+        df['sentiment'] = df.apply(get_sentiment, axis=1)
         return df
     
     def get_frequent_words(self, texts, n=10, sentiment_type='positive'):
         """获取高频情感词"""
         words = []
+        word_sentiments = {}  # 用于缓存词的情感值
         
         for text in texts:
             if isinstance(text, str):
@@ -52,17 +90,42 @@ class SentimentAnalyzer:
                             and not word.isdigit()
                             and len(word) > 2]  # 过滤短词
                 
-                # 使用 TextBlob 判断每个词的情感
+                # 获取整个评论的情感
+                text_sentiment = TextBlob(text).sentiment.polarity
+                
+                # 根据评论的整体情感来判断词的情感
                 for word in text_words:
-                    sentiment = TextBlob(word).sentiment.polarity
+                    if word not in word_sentiments:
+                        # 查找包含这个词的短语
+                        word_context = re.findall(f'[a-z]* {word} [a-z]*', text.lower())
+                        if word_context:
+                            # 使用短语的情感
+                            context_sentiment = sum(TextBlob(phrase).sentiment.polarity 
+                                                 for phrase in word_context) / len(word_context)
+                        else:
+                            # 如果找不到短语，使用评论的整体情感
+                            context_sentiment = text_sentiment
+                        
+                        word_sentiments[word] = context_sentiment
+                    
                     # 根据情感类型筛选词
-                    if (sentiment_type == 'positive' and sentiment > 0) or \
-                       (sentiment_type == 'negative' and sentiment < 0):
+                    if (sentiment_type == 'positive' and word_sentiments[word] > 0.1) or \
+                       (sentiment_type == 'negative' and word_sentiments[word] < -0.1):
                         words.append(word)
         
         # 统计词频
         word_freq = Counter(words)
-        return word_freq.most_common(n)
+        # 按情感强度排序
+        if sentiment_type == 'positive':
+            sorted_words = sorted(word_freq.items(), 
+                                key=lambda x: (x[1], word_sentiments[x[0]]), 
+                                reverse=True)
+        else:
+            sorted_words = sorted(word_freq.items(), 
+                                key=lambda x: (x[1], -word_sentiments[x[0]]), 
+                                reverse=True)
+        
+        return sorted_words[:n]
     
     def generate_word_cloud(self, df):
         """生成词云图"""
