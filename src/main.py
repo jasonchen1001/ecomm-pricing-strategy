@@ -1,5 +1,4 @@
 import pandas as pd
-from pathlib import Path
 from data_preprocessing import load_data, extract_features
 from price_elasticity import PriceElasticityAnalyzer
 from sentiment_analysis import SentimentAnalyzer

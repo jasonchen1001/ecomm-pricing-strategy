@@ -7,21 +7,13 @@ from price_elasticity import PriceElasticityAnalyzer
 from sentiment_analysis import SentimentAnalyzer
 import plotly.express as px
 import plotly.graph_objects as go
-import plotly.figure_factory as ff
 import numpy as np
-from sklearn.linear_model import LinearRegression
 from wordcloud import WordCloud
-from io import BytesIO
 from nltk.corpus import opinion_lexicon
 import nltk
 
-# 设置页面配置
-st.set_page_config(
-    page_title="Amazon Cable Products Analysis",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# 必须是第一个 Streamlit 命令
+st.set_page_config(page_title="Amazon Product Analysis", layout="wide")
 
 # 自定义CSS样式
 st.markdown("""
@@ -101,13 +93,13 @@ def create_wordcloud(text, title, sentiment_type='positive'):
         'disappointing', 'terrible', 'horrible', 'awful',
         'worthless', 'poor-quality', 'unreliable', 'unstable',
         'overpriced', 'ineffective', 'malfunctioning',
-        'negative', 'strain'  
+        'negative', 'strain'
     }
     
     # 需要移除的歧义词
     ambiguous_words = {
+        'quality',    # 可能表示好(积极)或差(消极)
         'cheap',      # 可能表示便宜(积极)或劣质(消极)
-        'quality',    # 可能表示便宜(积极)或劣质(消极)
         'hard',       # 可能表示坚硬(积极)或困难(消极)
         'emergency',  # 描述情况而非产品质量
         'blame',      # 描述行为而非产品
@@ -176,10 +168,10 @@ def create_wordcloud(text, title, sentiment_type='positive'):
         prefer_horizontal=0.7
     ).generate(text)
     
+    # 创建图形但不添加标题
     fig, ax = plt.subplots(figsize=(10, 5))
     ax.imshow(wordcloud, interpolation='bilinear')
     ax.axis('off')
-    ax.set_title(title)
     return fig
 
 def get_top_sentiment_words(text, sentiment_type='positive', n=10):
@@ -256,13 +248,74 @@ def get_top_sentiment_words(text, sentiment_type='positive', n=10):
     top_words = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)[:n]
     return top_words
 
+def get_display_text(en_text, zh_text, lang='en'):
+    """根据选择的语言返回显示文本"""
+    return en_text if lang == 'en' else zh_text
+
 def main():
-    # 标题和介绍
-    st.title('📊 Amazon Cable Products Pricing Analysis')
-    st.markdown("""
-    This dashboard provides comprehensive analysis of cable products pricing on Amazon India.
-    Use the filters in the sidebar to explore different price ranges and product categories.
-    """)
+    # 添加语言选择器到侧边栏
+    lang = st.sidebar.selectbox(
+        "Language / 语言",
+        options=['en', 'zh'],
+        format_func=lambda x: "English" if x == 'en' else "中文"
+    )
+    
+    try:
+        df = load_data('amazon.csv')
+    except Exception as e:
+        st.error(get_display_text(
+            'Error loading data: Please check if amazon.csv exists in the correct location.',
+            '加载数据错误：请检查 amazon.csv 文件是否存在于正确位置。',
+            lang
+        ))
+        st.exception(e)
+        return
+    
+    st.title(get_display_text(
+        '🛍️ Amazon Product Analysis Dashboard',
+        '🛍️ 亚马逊产品分析仪表板',
+        lang
+    ))
+    
+    # Market Overview 部分移到这里
+    st.header(get_display_text('📊 Market Overview', '📊 市场概览', lang))
+    
+    # 显示关键指标
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric(
+            get_display_text("Total Products", "产品总数", lang),
+            f"{len(df):,}"
+        )
+    
+    with col2:
+        avg_rating = df['rating'].mean()
+        st.metric(
+            get_display_text("Average Rating", "平均评分", lang),
+            f"{avg_rating:.2f} ⭐"
+        )
+    
+    with col3:
+        avg_price = df['discounted_price'].mean()
+        st.metric(
+            get_display_text("Average Price", "平均价格", lang),
+            f"₹{avg_price:.2f}"
+        )
+    
+    with col4:
+        avg_discount = df['real_discount'].mean()
+        st.metric(
+            get_display_text("Average Discount", "平均折扣", lang),
+            f"{avg_discount:.1f}%"
+        )
+    
+    # 创建标签页 - 调整顺序
+    tab1, tab2, tab3 = st.tabs([
+        get_display_text('Price Analysis', '价格分析', lang),
+        get_display_text('Review Analysis', '评论分析', lang),
+        get_display_text('Product Rankings', '产品排名', lang)
+    ])
     
     # 加载数据时显示进度条
     with st.spinner('Loading data...'):
@@ -320,38 +373,11 @@ def main():
             except AttributeError:
                 st.error("Refresh functionality not available in this Streamlit version")
     
-    # 市场概览使用卡片式设计
-    st.header('📈 Market Overview')
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric(
-            'Total Products',
-            len(filtered_df),
-            delta=f"{len(filtered_df)-len(df)} from total"
-        )
-    with col2:
-        st.metric(
-            'Average Rating',
-            f"{filtered_df['rating'].mean():.2f}",
-            delta=f"{(filtered_df['rating'].mean() - df['rating'].mean()):.2f}"
-        )
-    with col3:
-        st.metric(
-            'Average Discount',
-            f"{filtered_df['real_discount'].mean():.1f}%"
-        )
-    with col4:
-        st.metric(
-            'Price Range',
-            f"₹{filtered_df['discounted_price'].min():.0f} - ₹{filtered_df['discounted_price'].max():.0f}"
-        )
-    
     # 使用tabs组织内容
-    tab1, tab2, tab3 = st.tabs(["Price Analysis", "Sentiment Analysis", "Product Rankings"])
-    
     with tab1:
-        # Price Analysis 标签页
+        # Price Analysis 内容
+        st.header(get_display_text('💰 Price Analysis', '💰 价格分析', lang))
+        
         col1, col2 = st.columns(2)
         
         with col1:
@@ -515,9 +541,10 @@ def main():
             st.plotly_chart(fig, use_container_width=True)
     
     with tab2:
-        st.header('📝 Review Analysis')
+        # Review Analysis 内容
+        st.header(get_display_text('📝 Review Analysis', '📝 评论分析', lang))
         
-        # 1. 情感分布指标
+        # 显示情感分布指标
         total_reviews = len(df)
         positive_count = (df['sentiment'] == 1.0).sum()
         neutral_count = (df['sentiment'] == 0.0).sum()
@@ -527,32 +554,33 @@ def main():
         neutral_ratio = (neutral_count / total_reviews) * 100
         negative_ratio = (negative_count / total_reviews) * 100
         
-        st.markdown("### 评论情感分布")
+        # 使用列布局显示指标
+        st.markdown(get_display_text("### Sentiment Distribution", "### 评论情感分布", lang))
         metric_cols = st.columns(3)
         
         with metric_cols[0]:
             st.metric(
-                "积极评论",
+                get_display_text("Positive Reviews", "积极评论", lang),
                 f"{positive_ratio:.1f}%",
-                f"{positive_count} 条评论"
+                get_display_text(f"{positive_count} reviews", f"{positive_count} 条评论", lang)
             )
         
         with metric_cols[1]:
             st.metric(
-                "中性评论",
+                get_display_text("Neutral Reviews", "中性评论", lang),
                 f"{neutral_ratio:.1f}%",
-                f"{neutral_count} 条评论"
+                get_display_text(f"{neutral_count} reviews", f"{neutral_count} 条评论", lang)
             )
         
         with metric_cols[2]:
             st.metric(
-                "消极评论",
+                get_display_text("Negative Reviews", "消极评论", lang),
                 f"{negative_ratio:.1f}%",
-                f"{negative_count} 条评论"
+                get_display_text(f"{negative_count} reviews", f"{negative_count} 条评论", lang)
             )
         
-        # 2. 情感词分析
-        st.markdown("### 情感词分析")
+        # 情感词分析部分
+        st.markdown(get_display_text("### Sentiment Word Analysis", "### 情感词分析", lang))
         
         # 获取正面和负面评论的文本
         positive_text = ' '.join(df[df['sentiment'] == 1.0]['review_content'].astype(str))
@@ -562,10 +590,14 @@ def main():
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("#### 积极评论关键词")
+            st.markdown(get_display_text("#### Positive Review Keywords", "#### 积极评论关键词", lang))
             # 词云图
             if positive_text:
-                fig_pos = create_wordcloud(positive_text, "Positive Reviews", 'positive')
+                fig_pos = create_wordcloud(
+                    positive_text,
+                    get_display_text("Positive Reviews", "积极评论", lang),
+                    'positive'
+                )
                 st.pyplot(fig_pos)
             
             # 积极情感词频率直方图
@@ -580,16 +612,20 @@ def main():
                 
                 fig_pos_freq = go.Figure()
                 fig_pos_freq.add_trace(go.Bar(
-                    x=[word for word, _ in top_positive],  # 不需要反转，保持原有顺序（频次从高到低）
+                    x=[word for word, _ in top_positive],
                     y=[freq for _, freq in top_positive],
-                    marker_color=green_colors,  # 颜色列表从深到浅
-                    hovertemplate='词语: %{x}<br>频次: %{y}<extra></extra>'
+                    marker_color=green_colors,
+                    hovertemplate=get_display_text(
+                        'Word: %{x}<br>Frequency: %{y}',
+                        '词语: %{x}<br>频次: %{y}',
+                        lang
+                    ) + '<extra></extra>'
                 ))
                 
                 fig_pos_freq.update_layout(
-                    title="Top 10 Positive Words",
-                    xaxis_title="Words",
-                    yaxis_title="Frequency",
+                    title=get_display_text("Top 10 Positive Words", "前10个积极词", lang),
+                    xaxis_title=get_display_text("Words", "词语", lang),
+                    yaxis_title=get_display_text("Frequency", "频次", lang),
                     showlegend=False,
                     xaxis_tickangle=-45,
                     height=400,
@@ -600,10 +636,14 @@ def main():
                 st.plotly_chart(fig_pos_freq)
         
         with col2:
-            st.markdown("#### 消极评论关键词")
+            st.markdown(get_display_text("#### Negative Review Keywords", "#### 消极评论关键词", lang))
             # 词云图
             if negative_text:
-                fig_neg = create_wordcloud(negative_text, "Negative Reviews", 'negative')
+                fig_neg = create_wordcloud(
+                    negative_text,
+                    get_display_text("Negative Reviews", "消极评论", lang),
+                    'negative'
+                )
                 st.pyplot(fig_neg)
             
             # 消极情感词频率直方图
@@ -618,16 +658,20 @@ def main():
                 
                 fig_neg_freq = go.Figure()
                 fig_neg_freq.add_trace(go.Bar(
-                    x=[word for word, _ in top_negative],  # 不需要反转，保持原有顺序（频次从高到低）
+                    x=[word for word, _ in top_negative],
                     y=[freq for _, freq in top_negative],
-                    marker_color=red_colors,  # 颜色列表从深到浅
-                    hovertemplate='词语: %{x}<br>频次: %{y}<extra></extra>'
+                    marker_color=red_colors,
+                    hovertemplate=get_display_text(
+                        'Word: %{x}<br>Frequency: %{y}',
+                        '词语: %{x}<br>频次: %{y}',
+                        lang
+                    ) + '<extra></extra>'
                 ))
                 
                 fig_neg_freq.update_layout(
-                    title="Top 10 Negative Words",
-                    xaxis_title="Words",
-                    yaxis_title="Frequency",
+                    title=get_display_text("Top 10 Negative Words", "前10个消极词", lang),
+                    xaxis_title=get_display_text("Words", "词语", lang),
+                    yaxis_title=get_display_text("Frequency", "频次", lang),
                     showlegend=False,
                     xaxis_tickangle=-45,
                     height=400,
@@ -637,8 +681,8 @@ def main():
                 )
                 st.plotly_chart(fig_neg_freq)
         
-        # 3. 评分分布（移到最下面）
-        st.markdown("### 评分分布")
+        # 评分分布
+        st.markdown(get_display_text("### Rating Distribution", "### 评分分布", lang))
         rating_counts = df['rating'].value_counts().sort_index()
         fig_rating = go.Figure()
         
@@ -647,20 +691,20 @@ def main():
             x=rating_counts.index,
             y=rating_counts.values,
             marker_color='rgb(0, 123, 255)',
-            hovertemplate='评分: %{x}<br>数量: %{y}<extra></extra>'
+            hovertemplate=get_display_text('Rating: %{x}<br>Count: %{y}', '评分: %{x}<br>数量: %{y}', lang) + '<extra></extra>'
         ))
         
         # 更新布局
         fig_rating.update_layout(
             title={
-                'text': '评分分布',
+                'text': get_display_text('Rating Distribution', '评分分布', lang),
                 'y': 0.9,
                 'x': 0.5,
                 'xanchor': 'center',
                 'yanchor': 'top'
             },
             xaxis=dict(
-                title='评分',
+                title=get_display_text('Rating', '评分', lang),
                 tickmode='array',
                 ticktext=['1', '2', '3', '4', '5'],
                 tickvals=[1, 2, 3, 4, 5],
@@ -669,7 +713,7 @@ def main():
                 showgrid=True
             ),
             yaxis=dict(
-                title='评论数量',
+                title=get_display_text('Review Count', '评论数量', lang),
                 gridcolor='rgba(0,0,0,0.1)',
                 showgrid=True
             ),
@@ -686,14 +730,15 @@ def main():
             x=avg_rating,
             line_dash="dash",
             line_color="red",
-            annotation_text=f"平均评分: {avg_rating:.2f}",
+            annotation_text=get_display_text(f"Average Rating: {avg_rating:.2f}", f"平均评分: {avg_rating:.2f}", lang),
             annotation_position="top"
         )
         
         st.plotly_chart(fig_rating, use_container_width=True)
     
     with tab3:
-        st.subheader('Top Rated Products')
+        # Product Rankings 内容
+        st.header(get_display_text('🏆 Product Rankings', '🏆 产品排名', lang))
         top_products = filtered_df.nlargest(10, 'rating')[
             ['product_name', 'discounted_price', 'rating', 'rating_count']
         ].reset_index(drop=True)
@@ -704,15 +749,15 @@ def main():
             column_config={
                 "product_name": "Product Name",
                 "discounted_price": st.column_config.NumberColumn(
-                    "Price (₹)",
+                    get_display_text("Price (₹)", "价格 (₹)", lang),
                     format="₹%.2f"
                 ),
                 "rating": st.column_config.NumberColumn(
-                    "Rating",
+                    get_display_text("Rating", "评分", lang),
                     format="%.1f ⭐"
                 ),
                 "rating_count": st.column_config.NumberColumn(
-                    "Reviews",
+                    get_display_text("Reviews", "评论", lang),
                     format="%d 📝"
                 )
             },

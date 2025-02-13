@@ -1,6 +1,4 @@
 import pandas as pd
-import numpy as np
-from pathlib import Path
 
 def load_data(file_path):
     """加载数据并进行基础清洗"""
