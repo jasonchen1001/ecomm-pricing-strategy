@@ -4,9 +4,7 @@ from datetime import datetime
 import pytz
 
 # 项目路径配置
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUTPUT_DIR = os.path.join(PROJECT_ROOT, 'outputs')
-REPORT_DIR = os.path.join(OUTPUT_DIR, 'report')
+REPORT_DIR = '/Users/chenyanzhen/Documents/Amazon_Product_Pricing_Strategy_Optimization/amazon_pricing/outputs/report'
 
 # 创建必要的目录
 os.makedirs(REPORT_DIR, exist_ok=True)
@@ -47,10 +45,38 @@ def generate_report():
         beijing_time = datetime.now(beijing_tz)
         
         # 生成报告
-        report = f"""# 亚马逊产品定价策略分析报告
+        report_path = os.path.join(REPORT_DIR, 'pricing_strategy_report.md')
+        with open(report_path, 'w', encoding='utf-8') as f:
+            f.write(f"""# Cross-border E-commerce Pricing Strategy Optimization / 跨境电商产品定价策略优化
 
+[English](#english) | [中文](#chinese)
+
+## English
+
+### Amazon Product Pricing Strategy Analysis Report
+
+#### 1. Market Overview 📊
+- **Total Products Analyzed**: {total_products:,}
+- **Average Rating**: {df['rating'].mean():.2f} ⭐
+- **Average Discount**: {df['discount_percentage'].str.rstrip('%').astype(float).mean():.1f}%
+
+## 2. Sentiment Analysis 💭
+### Overall Sentiment Distribution
+- **Total Reviews**: {total_reviews:,}
+- **Positive Reviews**: {positive_reviews:,} ({positive_reviews/total_reviews*100:.1f}%)
+- **Negative Reviews**: {negative_reviews:,} ({negative_reviews/total_reviews*100:.1f}%)
+- **Positive to Negative Ratio**: {positive_reviews}:{negative_reviews} ({positive_reviews/negative_reviews:.2f}:1)
+- **Average Sentiment Score**: {avg_sentiment:.2f}
+
+### Sentiment Distribution Characteristics
+- Overall positive sentiment, with more than half of the reviews being positive
+- High sentiment score indicates good user satisfaction
+- Need to pay attention to negative reviews and improve product and service
+
+## 3. Price Adjustment Suggestions 💰
+### Price Adjustment Distribution
 ## 1. 市场概况 📊
-- **分析产品总数**: {total_products:,} 个
+- **分析产品总数**: {total_products:,}
 - **平均评分**: {df['rating'].mean():.2f} ⭐
 - **平均折扣率**: {df['discount_percentage'].str.rstrip('%').astype(float).mean():.1f}%
 
@@ -85,34 +111,33 @@ def generate_report():
 
 ## 4. 重点关注产品 ⭐
 
-### 最大提价产品 (Top 5)
-"""
-        # 添加最大提价产品
-        top_increases = recommendations.nlargest(5, 'adjusted_change')
-        for _, row in top_increases.iterrows():
-            product = df[df['product_id'] == row['product_id']].iloc[0]
-            report += f"""
+### 最大提价产品 (Top 5)""")
+            
+            # 添加最大提价产品
+            top_increases = recommendations.nlargest(5, 'adjusted_change')
+            for _, row in top_increases.iterrows():
+                product = df[df['product_id'] == row['product_id']].iloc[0]
+                f.write(f"""
 - **{product['product_name'][:50]}...**
   - 当前价格: ₹{row['current_price']:.2f}
   - 建议价格: ₹{row['recommended_price']:.2f} (+{row['adjusted_change']:.1f}%)
   - 评分: {product['rating']}⭐ ({product['rating_count']} 评论)
-  - 情感得分: {product['sentiment_score']:.2f}
-"""
+  - 情感得分: {product['sentiment_score']:.2f}""")
 
-        report += "\n### 最大降价产品 (Top 5)"
-        # 添加最大降价产品
-        top_decreases = recommendations.nsmallest(5, 'adjusted_change')
-        for _, row in top_decreases.iterrows():
-            product = df[df['product_id'] == row['product_id']].iloc[0]
-            report += f"""
+            f.write("\n\n### 最大降价产品 (Top 5)")
+            # 添加最大降价产品
+            top_decreases = recommendations.nsmallest(5, 'adjusted_change')
+            for _, row in top_decreases.iterrows():
+                product = df[df['product_id'] == row['product_id']].iloc[0]
+                f.write(f"""
 - **{product['product_name'][:50]}...**
   - 当前价格: ₹{row['current_price']:.2f}
   - 建议价格: ₹{row['recommended_price']:.2f} ({row['adjusted_change']:.1f}%)
   - 评分: {product['rating']}⭐ ({product['rating_count']} 评论)
-  - 情感得分: {product['sentiment_score']:.2f}
-"""
+  - 情感得分: {product['sentiment_score']:.2f}""")
 
-        report += """
+            f.write(f"""
+
 ## 5. 策略建议 📈
 
 ### 定价策略
@@ -149,12 +174,7 @@ def generate_report():
 
 ---
 *报告生成时间: {beijing_time.strftime('%Y年%m月%d日 %H:%M:%S')}*
-"""
-        
-        # 保存报告
-        report_path = os.path.join(REPORT_DIR, 'pricing_strategy_report.md')
-        with open(report_path, 'w', encoding='utf-8') as f:
-            f.write(report)
+""")
         
         print(f"报告已生成到 {report_path}")
         
