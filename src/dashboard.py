@@ -272,8 +272,8 @@ def main():
         return
     
     st.title(get_display_text(
-        '🛍️ Amazon Product Analysis Dashboard',
-        '🛍️ 亚马逊产品分析仪表板',
+        '🚗 Amazon Product Analysis Dashboard',
+        '🚗 亚马逊产品分析仪表板',
         lang
     ))
     
@@ -582,200 +582,41 @@ def main():
             st.plotly_chart(fig, use_container_width=True)
     
     with tab2:
-        # Review Analysis 内容
-        # st.header(get_display_text('📝 Review Analysis', '📝 评论分析', lang))
+        # Review Analysis 标签页
+        st.subheader(get_display_text('Sentiment Analysis', '情感分析', lang))
         
-        # 显示情感分布指标
-        total_reviews = len(df)
-        positive_count = (df['sentiment'] == 1.0).sum()
-        neutral_count = (df['sentiment'] == 0.0).sum()
-        negative_count = (df['sentiment'] == -1.0).sum()
+        # 获取情感分析摘要
+        sentiment_summary = analyzer.get_sentiment_summary(filtered_df, lang)
         
-        positive_ratio = (positive_count / total_reviews) * 100
-        neutral_ratio = (neutral_count / total_reviews) * 100
-        negative_ratio = (negative_count / total_reviews) * 100
-        
-        # 使用列布局显示指标
-        st.markdown(get_display_text("### Sentiment Distribution", "### 评论情感分布", lang))
-        metric_cols = st.columns(3)
-        
-        with metric_cols[0]:
-            st.metric(
-                get_display_text("Positive Reviews", "积极评论", lang),
-                f"{positive_ratio:.1f}%",
-                get_display_text(f"{positive_count} reviews", f"{positive_count} 条评论", lang)
-            )
-        
-        with metric_cols[1]:
-            st.metric(
-                get_display_text("Neutral Reviews", "中性评论", lang),
-                f"{neutral_ratio:.1f}%",
-                get_display_text(f"{neutral_count} reviews", f"{neutral_count} 条评论", lang)
-            )
-        
-        with metric_cols[2]:
-            st.metric(
-                get_display_text("Negative Reviews", "消极评论", lang),
-                f"{negative_ratio:.1f}%",
-                get_display_text(f"{negative_count} reviews", f"{negative_count} 条评论", lang)
-            )
-        
-        # 情感词分析部分
-        st.markdown(get_display_text("### Sentiment Word Analysis", "### 情感词分析", lang))
-        
-        # 获取正面和负面评论的文本
-        positive_text = ' '.join(df[df['sentiment'] == 1.0]['review_content'].astype(str))
-        negative_text = ' '.join(df[df['sentiment'] == -1.0]['review_content'].astype(str))
-        
-        # 创建两列布局
-        col1, col2 = st.columns(2)
-        
+        # 显示情感分布
+        col1, col2, col3 = st.columns(3)
         with col1:
-            st.markdown(get_display_text("#### Positive Review Keywords", "#### 积极评论关键词", lang))
-            # 词云图
-            if positive_text:
-                fig_pos = create_wordcloud(
-                    positive_text,
-                    get_display_text("Positive Reviews", "积极评论", lang),
-                    'positive'
-                )
-                st.pyplot(fig_pos)
-            
-            # 积极情感词频率直方图
-            top_positive = get_top_sentiment_words(positive_text, 'positive', 10)
-            if top_positive:
-                # 创建渐变绿色（频次高的颜色更深）
-                n_bars = len(top_positive)
-                green_colors = [
-                    f'rgba(40, {200 - i * 15}, 40, {1 - i * 0.05})'  # 从深到浅的绿色
-                    for i in range(n_bars)
-                ]
-                
-                fig_pos_freq = go.Figure()
-                fig_pos_freq.add_trace(go.Bar(
-                    x=[word for word, _ in top_positive],
-                    y=[freq for _, freq in top_positive],
-                    marker_color=green_colors,
-                    hovertemplate=get_display_text(
-                        'Word: %{x}<br>Frequency: %{y}',
-                        '词语: %{x}<br>频次: %{y}',
-                        lang
-                    ) + '<extra></extra>'
-                ))
-                
-                fig_pos_freq.update_layout(
-                    title=get_display_text("Top 10 Positive Words", "前10个积极词", lang),
-                    xaxis_title=get_display_text("Words", "词语", lang),
-                    yaxis_title=get_display_text("Frequency", "频次", lang),
-                    showlegend=False,
-                    xaxis_tickangle=-45,
-                    height=400,
-                    plot_bgcolor='white',
-                    yaxis=dict(gridcolor='rgba(0,0,0,0.1)'),
-                    margin=dict(l=50, r=20, t=50, b=80)
-                )
-                st.plotly_chart(fig_pos_freq)
+            st.metric(
+                get_display_text('Positive Reviews', '正面评论', lang),
+                f"{sentiment_summary['positive_pct']:.1f}%"
+            )
+        with col2:
+            st.metric(
+                get_display_text('Neutral Reviews', '中性评论', lang),
+                f"{sentiment_summary['neutral_pct']:.1f}%"
+            )
+        with col3:
+            st.metric(
+                get_display_text('Negative Reviews', '负面评论', lang),
+                f"{sentiment_summary['negative_pct']:.1f}%"
+            )
+        
+        st.plotly_chart(sentiment_summary['distribution_plot'], use_container_width=True)
+        
+        # 显示Top情感词
+        col1, col2 = st.columns(2)
+        with col1:
+            pos_words = analyzer.get_top_sentiment_words(filtered_df, 'positive', 10, lang)
+            st.plotly_chart(pos_words['plot'], use_container_width=True)
         
         with col2:
-            st.markdown(get_display_text("#### Negative Review Keywords", "#### 消极评论关键词", lang))
-            # 词云图
-            if negative_text:
-                fig_neg = create_wordcloud(
-                    negative_text,
-                    get_display_text("Negative Reviews", "消极评论", lang),
-                    'negative'
-                )
-                st.pyplot(fig_neg)
-            
-            # 消极情感词频率直方图
-            top_negative = get_top_sentiment_words(negative_text, 'negative', 10)
-            if top_negative:
-                # 创建渐变红色（频次高的颜色更深）
-                n_bars = len(top_negative)
-                red_colors = [
-                    f'rgba({255 - i * 10}, {20 + i * 5}, {20 + i * 5}, {1 - i * 0.05})'  # 从深到浅的红色
-                    for i in range(n_bars)
-                ]
-                
-                fig_neg_freq = go.Figure()
-                fig_neg_freq.add_trace(go.Bar(
-                    x=[word for word, _ in top_negative],
-                    y=[freq for _, freq in top_negative],
-                    marker_color=red_colors,
-                    hovertemplate=get_display_text(
-                        'Word: %{x}<br>Frequency: %{y}',
-                        '词语: %{x}<br>频次: %{y}',
-                        lang
-                    ) + '<extra></extra>'
-                ))
-                
-                fig_neg_freq.update_layout(
-                    title=get_display_text("Top 10 Negative Words", "前10个消极词", lang),
-                    xaxis_title=get_display_text("Words", "词语", lang),
-                    yaxis_title=get_display_text("Frequency", "频次", lang),
-                    showlegend=False,
-                    xaxis_tickangle=-45,
-                    height=400,
-                    plot_bgcolor='white',
-                    yaxis=dict(gridcolor='rgba(0,0,0,0.1)'),
-                    margin=dict(l=50, r=20, t=50, b=80)
-                )
-                st.plotly_chart(fig_neg_freq)
-        
-        # 评分分布
-        st.markdown(get_display_text("### Rating Distribution", "### 评分分布", lang))
-        rating_counts = df['rating'].value_counts().sort_index()
-        fig_rating = go.Figure()
-        
-        # 添加柱状图
-        fig_rating.add_trace(go.Bar(
-            x=rating_counts.index,
-            y=rating_counts.values,
-            marker_color='rgb(0, 123, 255)',
-            hovertemplate=get_display_text('Rating: %{x}<br>Count: %{y}', '评分: %{x}<br>数量: %{y}', lang) + '<extra></extra>'
-        ))
-        
-        # 更新布局
-        fig_rating.update_layout(
-            title={
-                'text': get_display_text('Rating Distribution', '评分分布', lang),
-                'y': 0.9,
-                'x': 0.5,
-                'xanchor': 'center',
-                'yanchor': 'top'
-            },
-            xaxis=dict(
-                title=get_display_text('Rating', '评分', lang),
-                tickmode='array',
-                ticktext=['1', '2', '3', '4', '5'],
-                tickvals=[1, 2, 3, 4, 5],
-                tickangle=0,
-                gridcolor='rgba(0,0,0,0.1)',
-                showgrid=True
-            ),
-            yaxis=dict(
-                title=get_display_text('Review Count', '评论数量', lang),
-                gridcolor='rgba(0,0,0,0.1)',
-                showgrid=True
-            ),
-            plot_bgcolor='white',
-            showlegend=False,
-            height=400,
-            margin=dict(l=50, r=50, t=80, b=50),
-            bargap=0.2
-        )
-        
-        # 添加平均评分标注
-        avg_rating = df['rating'].mean()
-        fig_rating.add_vline(
-            x=avg_rating,
-            line_dash="dash",
-            line_color="red",
-            annotation_text=get_display_text(f"Average Rating: {avg_rating:.2f}", f"平均评分: {avg_rating:.2f}", lang),
-            annotation_position="top"
-        )
-        
-        st.plotly_chart(fig_rating, use_container_width=True)
+            neg_words = analyzer.get_top_sentiment_words(filtered_df, 'negative', 10, lang)
+            st.plotly_chart(neg_words['plot'], use_container_width=True)
     
     with tab3:
         # Product Rankings 内容
