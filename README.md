@@ -9,103 +9,90 @@
 ## English
 
 ### Overview
-An interactive dashboard for analyzing Amazon product data, with a focus on price elasticity, customer reviews, and market trends.
+A data-driven pricing strategy optimization system for Amazon India products, focusing on sentiment analysis and dynamic pricing recommendations. The system analyzes customer reviews using BERT model and provides price adjustment suggestions based on sentiment scores and market performance.
 
 ### Project Structure
 ```
-amazon-product-analysis/
+amazon_pricing/
 ├── data/                # Data files
-│   └── amazon.csv
+│   ├── amazon.csv      # Raw data
+│   └── processed_amazon.csv  # Processed data with sentiment scores
 ├── src/                 # Source code
-│   ├── data_preprocessing.py
-│   ├── price_elasticity.py
-│   ├── sentiment_analysis.py
-│   ├── pricing_model.py
-│   └── dashboard.py
+│   ├── data_preprocessing.py # Data cleaning and feature extraction
+│   ├── sentiment_analysis.py # BERT-based sentiment analysis
+│   ├── pricing_model.py      # Random Forest based pricing model
+│   └── main.py              # Report generation script
 ├── outputs/             # Analysis results
-│   └── report.txt
-├── docs/               # Documentation
-│   └── images/
-├── requirements.txt    # Dependencies
+│   └── report/         # Generated reports
+│       └── pricing_strategy_report.md  # Bilingual analysis report
 └── README.md
 ```
 
-### Features
-- 📊 Market Overview
-  - Key metrics and market indicators
-  - Price distribution analysis
-  - Rating distribution visualization
+### Key Features
+- 📊 Sentiment Analysis
+  - BERT-based review sentiment analysis
+  - Positive/Negative classification
+  - Sentiment score calculation (0-1)
+  - Review sentiment distribution analysis
 
-- 💰 Price Analysis
-  - Price elasticity calculation
-  - Price-demand relationship
-  - Correlation analysis
+- 💰 Price Optimization
+  - Random Forest based pricing model
+  - Price adjustments (±5% range)
+  - Revenue impact prediction
+  - Confidence score for recommendations
 
-- 📝 Review Analysis
-  - Sentiment analysis
-  - Keyword extraction
-  - Review trends visualization
+- 📝 Strategy Report
+  - Bilingual report (English/Chinese)
+  - Market overview
+  - Sentiment analysis results
+  - Top products for price adjustments
+  - Strategic recommendations
 
-### Business Background
-With the rapid growth of the Indian e-commerce market, the 3C accessories category faces intense price competition. This project focuses on cable products (charging/data cables) and uses data analysis and machine learning to optimize pricing strategies to achieve:
+### Analysis Results
+- **Sentiment Distribution**
+  - Positive Reviews: 58.3%
+  - Negative Reviews: 41.7%
+  - Average Sentiment Score: 0.94
 
-- 🚀 Identify price-sensitive groups
-- 💡 Quantify price elasticity
-- 📊 Build dynamic pricing models
-- 📈 Increase overall gross margin by 15-20%
-
-### Core Value
-```text
-├── Precise pricing recommendations → Improve conversion rate
-├── Inventory optimization → Reduce dead stock by 30%
-└── Competitor monitoring → 50% faster price response
-```
-
-### Technical Architecture
-```mermaid
-graph TD
-    A[Raw Data] --> B{Data Preprocessing}
-    B --> C[Feature Engineering]
-    C --> D[Price Elasticity Analysis]
-    C --> E[Sentiment Analysis]
-    D --> F[Dynamic Pricing Model]
-    E --> F
-    F --> G[Strategy Dashboard]
-```
+- **Price Adjustments**
+  - Recommended Increases: 65.3%
+  - Recommended Decreases: 34.7%
+  - Average Adjustment: 0.9%
+  - Expected Revenue Growth: 3.5%
 
 ### Dataset
-- Amazon India cable category product data (including price/reviews/ratings)
-- **Field descriptions**:
+- Amazon India product data (including prices/reviews/ratings)
+- **Fields**:
   ```python
-  product_id        # Unique product identifier
-  discounted_price  # Discounted price (₹)
-  actual_price      # Original price (₹)
-  rating_count      # Number of ratings (sales proxy)
-  review_content    # User review text
-  product_name      # Product name (includes length/brand info)
+  product_id          # Unique product identifier
+  product_name        # Product name
+  discounted_price    # Current price (₹)
+  actual_price        # Original price (₹)
+  discount_percentage # Discount rate
+  rating             # Average rating (1-5)
+  rating_count       # Number of ratings
+  review_content     # User review text
+  sentiment          # POSITIVE/NEGATIVE
+  sentiment_score    # Sentiment score (0-1)
   ```
-
-### Sample Data
-| product_id | discounted_price | rating | rating_count | review_content               |
-|------------|------------------|--------|--------------|------------------------------|
-| B08HDJ86NZ | 329              | 4.2    | 94,363       | "Fast charging, good quality..." |
 
 ### Requirements
 - Python 3.8+
-- RAM ≥ 8GB
 - Required packages:
-  - Streamlit
-  - Pandas
-  - Plotly
-  - NLTK
-  - WordCloud
-  - NumPy
+  ```
+  pandas>=1.3.0
+  numpy>=1.19.0
+  transformers>=4.5.0
+  torch>=1.8.0
+  pytz>=2021.1
+  scikit-learn>=0.24.0
+  ```
 
 ### Quick Start
 1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/amazon-product-analysis.git
-cd amazon-product-analysis
+git clone https://github.com/yourusername/amazon_pricing.git
+cd amazon_pricing
 ```
 
 2. Install dependencies
@@ -113,30 +100,26 @@ cd amazon-product-analysis
 pip install -r requirements.txt
 ```
 
-3. Run the dashboard
+3. Run the analysis
 ```bash
-streamlit run src/dashboard.py
+python src/main.py
 ```
 
-### Core Analysis
-#### Price Elasticity Model
-```python
-# Code snippet
-from sklearn.linear_model import ElasticNet
+The script will:
+1. Load the processed data with sentiment analysis results
+2. Generate price adjustment recommendations
+3. Create a bilingual analysis report in `outputs/report/`
 
-model = ElasticNet(alpha=0.5, l1_ratio=0.7)
-model.fit(X_train, y_train)
-print(f"Price elasticity coefficient: {model.coef_[0]:.2f}")
-```
-
-#### Sentiment Analysis Results
-```text
-Positive keywords:
-Fast charging(63%)  Durable(45%)  Good value(32%)
-```
+### Model Details
+- **Sentiment Analysis**: DistilBERT model fine-tuned on Amazon reviews
+- **Pricing Model**: Random Forest with features:
+  - Review sentiment score
+  - Rating and rating count
+  - Current discount rate
+  - Category average price ratio
 
 ### License
-This project is licensed under the MIT License.
+MIT License
 
 ### Changelog
 
@@ -165,108 +148,98 @@ This project is licensed under the MIT License.
 **Optimize pricing strategy, lead the market competition**
 [Contact for details](mailto:yizhouchen68@gmail.com)
 
+### View Full Report
+For detailed analysis and recommendations, please check the [full report](amazon_pricing/outputs/report/pricing_strategy_report.md).
+
 ---
 
 ## Chinese
 
 ### 概述
-一个交互式的亚马逊产品数据分析仪表板，重点关注价格弹性、客户评论和市场趋势。
+基于数据驱动的亚马逊印度产品定价策略优化系统，使用BERT模型进行情感分析，并基于情感得分和市场表现提供价格调整建议。
 
 ### 项目结构
 ```
-amazon-product-analysis/
+amazon_pricing/
 ├── data/                # 数据文件
-│   └── amazon.csv
+│   ├── amazon.csv      # 原始数据
+│   └── processed_amazon.csv  # 带情感得分的处理后数据
 ├── src/                 # 源代码
-│   ├── data_preprocessing.py
-│   ├── price_elasticity.py
-│   ├── sentiment_analysis.py
-│   ├── pricing_model.py
-│   └── dashboard.py
+│   ├── data_preprocessing.py # 数据清洗和特征提取
+│   ├── sentiment_analysis.py # 基于BERT的情感分析
+│   ├── pricing_model.py      # 基于随机森林的定价模型
+│   └── main.py              # 报告生成脚本
 ├── outputs/             # 分析结果
-│   └── report.txt
-├── docs/               # 文档
-│   └── images/
-├── requirements.txt    # 依赖包
+│   └── report/         # 生成的报告
+│       └── pricing_strategy_report.md  # 中英双语分析报告
 └── README.md
 ```
 
-### 功能特点
-- 📊 市场概览
-  - 关键指标和市场指标
-  - 价格分布分析
-  - 评分分布可视化
+### 核心功能
+- 📊 情感分析
+  - 基于BERT的评论情感分析
+  - 正面/负面评论分类
+  - 情感得分计算（0-1）
+  - 评论情感分布分析
 
-- 💰 价格分析
-  - 价格弹性计算
-  - 价格-需求关系
-  - 相关性分析
+- 💰 价格优化
+  - 基于随机森林的定价模型
+  - 价格调整建议（±5%范围）
+  - 收入影响预测
+  - 建议置信度评分
 
-- 📝 评论分析
-  - 情感分析
-  - 关键词提取
-  - 评论趋势可视化
+- 📝 策略报告
+  - 中英双语报告
+  - 市场概况
+  - 情感分析结果
+  - 重点调价产品
+  - 策略建议
 
-### 业务背景
-随着印度电商市场高速增长，3C配件类目面临激烈的价格竞争。本项目针对线缆类产品（充电线/数据线），通过数据分析与机器学习技术优化定价策略，实现：
+### 分析结果
+- **情感分布**
+  - 正面评价：58.3%
+  - 负面评价：41.7%
+  - 平均情感得分：0.94
 
-- 🚀 识别价格敏感群体
-- 💡 量化价格弹性系数
-- 📊 构建动态定价模型
-- 📈 提升整体毛利率15-20%
-
-### 核心价值
-```text
-├── 精准定价建议 → 提升转化率
-├── 库存优化 → 降低滞销库存30%
-└── 竞品监控 → 价格响应速度提升50%
-```
-
-### 技术架构
-```mermaid
-graph TD
-    A[原始数据] --> B{数据预处理}
-    B --> C[特征工程]
-    C --> D[价格弹性分析]
-    C --> E[用户情感分析]
-    D --> F[动态定价模型]
-    E --> F
-    F --> G[策略可视化看板]
-```
+- **价格调整**
+  - 建议提价：65.3%
+  - 建议降价：34.7%
+  - 平均调整：0.9%
+  - 预期收入增长：3.5%
 
 ### 数据集
-- 印度亚马逊线缆类目产品数据（含价格/评论/评分）
+- 印度亚马逊产品数据（含价格/评论/评分）
 - **字段说明**：
   ```python
-  product_id        # 产品唯一标识
-  discounted_price  # 折扣价格（₹）
-  actual_price      # 原价（₹）
-  rating_count      # 评分人数（销量代理指标）
-  review_content    # 用户评论文本
-  product_name      # 产品名称（含长度/品牌信息）
+  product_id          # 产品唯一标识
+  product_name        # 产品名称
+  discounted_price    # 当前价格（₹）
+  actual_price        # 原价（₹）
+  discount_percentage # 折扣率
+  rating             # 平均评分（1-5）
+  rating_count       # 评分数量
+  review_content     # 用户评论文本
+  sentiment          # POSITIVE/NEGATIVE
+  sentiment_score    # 情感得分（0-1）
   ```
-
-### 数据示例
-| product_id | discounted_price | rating | rating_count | review_content               |
-|------------|------------------|--------|--------------|------------------------------|
-| B08HDJ86NZ | 329              | 4.2    | 94,363       | "充电速度很快，线材质量不错..." |
 
 ### 环境要求
 - Python 3.8+
-- RAM ≥ 8GB
 - 依赖包：
-  - Streamlit
-  - Pandas
-  - Plotly
-  - NLTK
-  - WordCloud
-  - NumPy
+  ```
+  pandas>=1.3.0
+  numpy>=1.19.0
+  transformers>=4.5.0
+  torch>=1.8.0
+  pytz>=2021.1
+  scikit-learn>=0.24.0
+  ```
 
 ### 快速开始
 1. 克隆仓库
 ```bash
-git clone https://github.com/yourusername/amazon-product-analysis.git
-cd amazon-product-analysis
+git clone https://github.com/yourusername/amazon_pricing.git
+cd amazon_pricing
 ```
 
 2. 安装依赖
@@ -274,30 +247,26 @@ cd amazon-product-analysis
 pip install -r requirements.txt
 ```
 
-3. 运行仪表板
+3. 运行分析
 ```bash
-streamlit run src/dashboard.py
+python src/main.py
 ```
 
-### 核心分析
-#### 价格弹性模型
-```python
-# 代码片段
-from sklearn.linear_model import ElasticNet
+脚本将：
+1. 加载带有情感分析结果的处理后数据
+2. 生成价格调整建议
+3. 在 `outputs/report/` 创建中英双语分析报告
 
-model = ElasticNet(alpha=0.5, l1_ratio=0.7)
-model.fit(X_train, y_train)
-print(f"价格弹性系数: {model.coef_[0]:.2f}")
-```
-
-#### 情感分析结果
-```text
-正面高频词：
-充电快(63%)  耐用(45%)  性价比高(32%)
-```
+### 模型详情
+- **情感分析**：在亚马逊评论上微调的DistilBERT模型
+- **定价模型**：使用以下特征的随机森林：
+  - 评论情感得分
+  - 评分和评论数量
+  - 当前折扣率
+  - 类别平均价格比
 
 ### 许可证
-本项目基于 MIT License 授权。
+MIT License
 
 ### 更新日志
 
@@ -325,3 +294,6 @@ print(f"价格弹性系数: {model.coef_[0]:.2f}")
 #### 获取完整方案
 **优化定价策略，领跑市场竞逐**
 [联系获取详情](mailto:yizhouchen68@gmail.com)
+
+### 查看完整报告
+详细的分析结果和建议请查看[完整报告](amazon_pricing/outputs/report/pricing_strategy_report.md)。
