@@ -10,7 +10,7 @@
 
 ## English
 
-[Overview](#overview) | [Features](#key-features) | [Results](#analysis-results) | [Quick Start](#quick-start) | [Report](./outputs/report/pricing_strategy_report.md)
+[Overview](#overview) | [Features](#key-features) | [Results](#analysis-results) | [Quick Start](#quick-start) | [Report](outputs/pricing_strategy_report.md)
 
 ### Overview
 A data-driven pricing strategy optimization system for Amazon India products, focusing on sentiment analysis and dynamic pricing recommendations. The system analyzes customer reviews using BERT model and provides price adjustment suggestions based on sentiment scores and market performance.
@@ -168,13 +168,13 @@ MIT License
 [Contact for details](mailto:yizhouchen68@gmail.com)
 
 #### View Full Report
-📊 For detailed analysis and recommendations, check our [comprehensive report](./outputs/report/pricing_strategy_report.md)
+📊 For detailed analysis and recommendations, check our [comprehensive report](outputs/pricing_strategy_report.md)
 
 ---
 
 ## Chinese
 
-[概述](#概述) | [功能](#核心功能) | [结果](#分析结果) | [快速开始](#快速开始) | [报告](./outputs/report/pricing_strategy_report.md)
+[概述](#概述) | [功能](#核心功能) | [结果](#分析结果) | [快速开始](#快速开始) | [报告](outputs/pricing_strategy_report.md)
 
 ### 概述
 基于数据驱动的亚马逊印度产品定价策略优化系统，使用BERT模型进行情感分析，并基于情感得分和市场表现提供价格调整建议。
@@ -332,4 +332,4 @@ MIT License
 [联系获取详情](mailto:yizhouchen68@gmail.com)
 
 #### 查看完整报告
-📊 详细的分析结果和建议请查看我们的[完整分析报告](./outputs/report/pricing_strategy_report.md)
+📊 详细的分析结果和建议请查看我们的[完整分析报告](outputs/pricing_strategy_report.md)
